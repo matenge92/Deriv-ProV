@@ -1,0 +1,191 @@
+<div id="app">
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon">🔑</div>
+        <h1>TradePro<span class="accent">FX</span></h1>
+        <p class="subtitle">Bot de Derivação Automática — Differs + Recovery + Anti-Manipulação</p>
+      </div>
+      <div class="login-body">
+        <label class="field-label">Tipo de Conta</label>
+        <div class="account-toggle">
+          <button id="btnDemo" class="toggle-btn active" onclick="setAccountType('demo')">🖥 Demo</button>
+          <button id="btnReal" class="toggle-btn" onclick="setAccountType('real')">🌐 Real</button>
+        </div>
+        <div id="loginError" class="error-box" style="display:none"></div>
+
+        <button id="btnDerivLogin" class="btn-primary" onclick="loginWithDeriv()">
+          Entrar com Deriv
+        </button>
+        <div id="realWarning" class="warning-box" style="display:none">
+          ⚠️ Atenção: Você está conectando a uma conta real. Use com responsabilidade.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="dashboard" style="display:none">
+    <!-- Header -->
+    <header class="top-bar">
+      <div class="top-left">
+        <h1 class="logo">TradePro<span class="accent">FX</span></h1>
+        <span id="headerLoginId" class="login-badge">—</span>
+      </div>
+      <div class="top-right">
+        <div class="balance-box">
+          <span class="label">Saldo</span>
+          <span id="headerBalance" class="value mono">0.00 <small>USD</small></span>
+        </div>
+        <button class="btn-icon" onclick="handleDisconnect()" title="Desconectar">⏏</button>
+      </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-item"><span class="stat-icon">📈</span>
+        <div>
+          <div class="stat-label">P/L Total</div>
+          <div id="statPL" class="stat-val mono green">+0.00</div>
+        </div>
+      </div>
+      <div class="stat-item"><span class="stat-icon">📊</span>
+        <div>
+          <div class="stat-label">Trades</div>
+          <div id="statTrades" class="stat-val mono">0</div>
+        </div>
+      </div>
+      <div class="stat-item"><span class="stat-icon">🎯</span>
+        <div>
+          <div class="stat-label">Vitórias</div>
+          <div id="statWL" class="stat-val mono">0/0</div>
+        </div>
+      </div>
+      <div class="stat-item"><span class="stat-icon">⚡</span>
+        <div>
+          <div class="stat-label">Win Rate</div>
+          <div id="statWR" class="stat-val mono">0.0%</div>
+        </div>
+      </div>
+      <div class="stat-item"><span class="stat-icon">📐</span>
+        <div>
+          <div class="stat-label">Recuperação</div>
+          <div id="statRecov" class="stat-val mono muted">0</div>
+        </div>
+      </div>
+      <div class="stat-item"><span class="stat-icon">🛡️</span>
+        <div>
+          <div class="stat-label">Anti-Manip.</div>
+          <div id="statAntiManip" class="stat-val mono green">✅ OK</div>
+        </div>
+      </div>
+      <div id="statusIndicator" class="status-dot" style="display:none"><span class="dot"></span> Ativo</div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Chart -->
+      <div class="chart-area">
+        <div class="chart-header">
+          <div class="chart-title">📈 <span id="chartSymbol">R_10</span>
+            <span id="recoveryBadge" class="recovery-badge" style="display:none">Recuperação</span>
+          </div>
+          <span id="chartPrice" class="mono price-tag">—</span>
+        </div>
+        <canvas id="chartCanvas"></canvas>
+      </div>
+
+      <!-- Side Panel -->
+      <div class="side-panel">
+        <!-- Tabs -->
+        <div class="tab-bar">
+          <button id="tabControls" class="tab active" onclick="switchTab('controls')">Controles</button>
+          <button id="tabHistory" class="tab" onclick="switchTab('history')">Histórico (<span id="histCount">0</span>)</button>
+        </div>
+
+        <!-- Controls Panel -->
+        <div id="panelControls" class="panel-content">
+          <label class="field-label">Mercado</label>
+          <select id="cfgSymbol" class="input-field">
+            <option value="R_10">Volatility 10</option>
+            <option value="R_25">Volatility 25</option>
+            <option value="R_50">Volatility 50</option>
+            <option value="R_75">Volatility 75</option>
+            <option value="R_100">Volatility 100</option>
+            <option value="1HZ10V">Vol 10 (1s)</option>
+            <option value="1HZ25V">Vol 25 (1s)</option>
+            <option value="1HZ50V">Vol 50 (1s)</option>
+            <option value="1HZ75V">Vol 75 (1s)</option>
+            <option value="1HZ100V">Vol 100 (1s)</option>
+          </select>
+
+          <label class="field-label">Dígito (Differs)</label>
+          <div class="digit-grid" id="digitGrid"></div>
+
+          <div class="field">
+            <label class="field-label">Stake Inicial</label>
+            <div class="input-wrap"><input id="cfgStake" type="number" value="0.35" step="0.05" min="0.35" class="input-field mono"><span class="suffix">USD</span></div>
+          </div>
+
+          <div id="liveStake" class="live-stake" style="display:none">
+            <span class="label">Stake Atual</span>
+            <span id="liveStakeVal" class="value mono">0.35 USD</span>
+          </div>
+
+          <div class="two-col">
+            <div class="field"><label class="field-label">Stop Loss</label>
+              <div class="input-wrap"><input id="cfgSL" type="number" value="10" class="input-field mono"><span class="suffix">USD</span></div>
+            </div>
+            <div class="field"><label class="field-label">Take Profit</label>
+              <div class="input-wrap"><input id="cfgTP" type="number" value="50" class="input-field mono"><span class="suffix">USD</span></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Meta Diária</label>
+            <div class="input-wrap"><input id="cfgDaily" type="number" value="100" class="input-field mono"><span class="suffix">USD</span></div>
+          </div>
+
+          <div class="section-divider"></div>
+          <h3 class="section-title">MARTINGALE</h3>
+          <div class="two-col">
+            <div class="field"><label class="field-label">Multiplicador</label>
+              <div class="input-wrap"><input id="cfgMult" type="number" value="2.2" step="0.1" class="input-field mono"><span class="suffix">x</span></div>
+            </div>
+            <div class="field"><label class="field-label">Máx Passos</label><input id="cfgMaxSteps" type="number" value="5" class="input-field mono"></div>
+          </div>
+
+          <div id="recoveryInfo" class="recovery-info" style="display:none">
+            <div class="ri-title">⚠️ Modo Recuperação Ativo</div>
+            <div id="recoveryDetail" class="ri-detail"></div>
+          </div>
+
+          <div class="two-col">
+            <div class="field"><label class="field-label">Duração</label><input id="cfgDuration" type="number" value="1" min="1" class="input-field mono"></div>
+            <div class="field"><label class="field-label">Tipo</label>
+              <select id="cfgDurType" class="input-field">
+                <option value="t">Ticks</option>
+                <option value="s">Segundos</option>
+                <option value="m">Minutos</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Panel -->
+        <div id="panelHistory" class="panel-content" style="display:none">
+          <div id="historyList" class="history-list">
+            <div class="empty-state">Nenhum trade realizado ainda</div>
+          </div>
+        </div>
+
+        <!-- START / STOP BUTTONS -->
+        <div class="action-bar">
+          <button id="btnStart" class="btn-start" onclick="startBot()">▶ Iniciar Bot</button>
+          <button id="btnStop" class="btn-stop" onclick="stopBot()" style="display:none">⏹ Parar Bot</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

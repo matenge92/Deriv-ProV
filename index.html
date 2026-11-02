@@ -1,191 +1,712 @@
+
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#10141d">
+
+  <title>TradeProJB | Deriv Trading Bot</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="bot.js" defer></script>
+</head>
+
+<body>
+
 <div id="app">
-  <!-- LOGIN SCREEN -->
-  <div id="loginScreen" class="login-screen">
+
+  <!-- ================= LOGIN ================= -->
+
+  <section id="loginScreen" class="login-screen">
+
     <div class="login-card">
-      <div class="login-header">
-        <div class="login-icon">🔑</div>
-        <h1>TradePro<span class="accent">FX</span></h1>
-        <p class="subtitle">Bot de Derivação Automática — Differs + Recovery + Anti-Manipulação</p>
-      </div>
-      <div class="login-body">
-        <label class="field-label">Tipo de Conta</label>
-        <div class="account-toggle">
-          <button id="btnDemo" class="toggle-btn active" onclick="setAccountType('demo')">🖥 Demo</button>
-          <button id="btnReal" class="toggle-btn" onclick="setAccountType('real')">🌐 Real</button>
-        </div>
-        <div id="loginError" class="error-box" style="display:none"></div>
 
-        <button id="btnDerivLogin" class="btn-primary" onclick="loginWithDeriv()">
-          Entrar com Deriv
+      <div class="login-logo">
+        <span class="logo-icon">TP</span>
+      </div>
+
+      <h1>TradeProJB</h1>
+
+      <p class="login-subtitle">
+        Sistema inteligente de análise e negociação Deriv
+      </p>
+
+      <div class="account-selection">
+
+        <button id="btnDemo" class="account-btn active"
+          onclick="setAccountType('demo')">
+          CONTA DEMO
         </button>
-        <div id="realWarning" class="warning-box" style="display:none">
-          ⚠️ Atenção: Você está conectando a uma conta real. Use com responsabilidade.
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- DASHBOARD -->
-  <div id="dashboard" class="dashboard" style="display:none">
-    <!-- Header -->
+        <button id="btnReal" class="account-btn"
+          onclick="setAccountType('real')">
+          CONTA REAL
+        </button>
+
+      </div>
+
+      <div id="realWarning" class="warning-box hidden">
+        Atenção: está a seleccionar uma conta real.
+        As operações envolvem risco financeiro.
+      </div>
+
+      <button id="btnDerivLogin" class="btn-deriv"
+        onclick="loginWithDeriv()">
+        <span>↗</span>
+        Entrar com Deriv
+      </button>
+
+      <div id="loginError" class="login-error"></div>
+
+      <div class="login-footer">
+        <span class="status-dot"></span>
+        Autenticação segura Deriv
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <!-- ================= DASHBOARD ================= -->
+
+  <main id="dashboard" class="dashboard hidden">
+
+    <!-- HEADER -->
+
     <header class="top-bar">
-      <div class="top-left">
-        <h1 class="logo">TradePro<span class="accent">FX</span></h1>
-        <span id="headerLoginId" class="login-badge">—</span>
-      </div>
-      <div class="top-right">
-        <div class="balance-box">
-          <span class="label">Saldo</span>
-          <span id="headerBalance" class="value mono">0.00 <small>USD</small></span>
+
+      <div class="brand-area">
+
+        <div class="brand-symbol">TP</div>
+
+        <div class="brand-text">
+          <h2>TradeProJB</h2>
+          <span>DERIV AUTOMATION SYSTEM</span>
         </div>
-        <button class="btn-icon" onclick="handleDisconnect()" title="Desconectar">⏏</button>
+
       </div>
+
+      <div class="header-account">
+
+        <div class="connection-info">
+          <span id="statusIndicator" class="status-dot"></span>
+          <span id="accountStatus">Aguardando ligação</span>
+        </div>
+
+        <div class="account-info">
+          <span id="headerLoginId">---</span>
+          <strong id="headerBalance">0.00 USD</strong>
+        </div>
+
+        <button class="icon-btn disconnect-btn"
+          onclick="handleDisconnect()"
+          title="Desligar conta">
+          ⏻
+        </button>
+
+      </div>
+
     </header>
 
-    <!-- Stats Bar -->
-    <div class="stats-bar">
-      <div class="stat-item"><span class="stat-icon">📈</span>
-        <div>
-          <div class="stat-label">P/L Total</div>
-          <div id="statPL" class="stat-val mono green">+0.00</div>
-        </div>
-      </div>
-      <div class="stat-item"><span class="stat-icon">📊</span>
-        <div>
-          <div class="stat-label">Trades</div>
-          <div id="statTrades" class="stat-val mono">0</div>
-        </div>
-      </div>
-      <div class="stat-item"><span class="stat-icon">🎯</span>
-        <div>
-          <div class="stat-label">Vitórias</div>
-          <div id="statWL" class="stat-val mono">0/0</div>
-        </div>
-      </div>
-      <div class="stat-item"><span class="stat-icon">⚡</span>
-        <div>
-          <div class="stat-label">Win Rate</div>
-          <div id="statWR" class="stat-val mono">0.0%</div>
-        </div>
-      </div>
-      <div class="stat-item"><span class="stat-icon">📐</span>
-        <div>
-          <div class="stat-label">Recuperação</div>
-          <div id="statRecov" class="stat-val mono muted">0</div>
-        </div>
-      </div>
-      <div class="stat-item"><span class="stat-icon">🛡️</span>
-        <div>
-          <div class="stat-label">Anti-Manip.</div>
-          <div id="statAntiManip" class="stat-val mono green">✅ OK</div>
-        </div>
-      </div>
-      <div id="statusIndicator" class="status-dot" style="display:none"><span class="dot"></span> Ativo</div>
-    </div>
 
-    <!-- Main Grid -->
-    <div class="main-grid">
-      <!-- Chart -->
-      <div class="chart-area">
-        <div class="chart-header">
-          <div class="chart-title">📈 <span id="chartSymbol">R_10</span>
-            <span id="recoveryBadge" class="recovery-badge" style="display:none">Recuperação</span>
+    <!-- FINANCIAL STATS -->
+
+    <section class="stats-grid">
+
+      <div class="stat-card">
+        <span class="stat-label">LUCRO / PREJUÍZO</span>
+        <strong id="statPL">0.00 USD</strong>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">OPERAÇÕES</span>
+        <strong id="statTrades">0</strong>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">VITÓRIAS / DERROTAS</span>
+        <strong id="statWL">0 / 0</strong>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">TAXA DE ACERTO</span>
+        <strong id="statWR">0%</strong>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">RECUPERAÇÕES</span>
+        <strong id="statRecov">0</strong>
+      </div>
+
+      <div class="stat-card">
+        <span class="stat-label">FILTRO ESTATÍSTICO</span>
+        <strong id="statAntiManip">AGUARDANDO</strong>
+      </div>
+
+    </section>
+
+
+    <!-- MARKET SELECTOR -->
+
+    <section class="market-toolbar">
+
+      <div class="market-heading">
+        <span class="market-label">MERCADO ACTIVO</span>
+        <strong id="chartSymbol">Volatility 10 Index</strong>
+      </div>
+
+      <div class="market-selector">
+
+        <label for="cfgSymbol">Seleccionar índice</label>
+
+        <select id="cfgSymbol" class="market-select">
+
+          <option value="R_10">Volatility 10 Index</option>
+          <option value="R_25">Volatility 25 Index</option>
+          <option value="R_50">Volatility 50 Index</option>
+          <option value="R_75">Volatility 75 Index</option>
+          <option value="R_100">Volatility 100 Index</option>
+
+          <option value="1HZ10V">Volatility 10 (1s) Index</option>
+          <option value="1HZ25V">Volatility 25 (1s) Index</option>
+          <option value="1HZ50V">Volatility 50 (1s) Index</option>
+          <option value="1HZ75V">Volatility 75 (1s) Index</option>
+          <option value="1HZ100V">Volatility 100 (1s) Index</option>
+
+        </select>
+
+      </div>
+
+    </section>
+
+
+    <!-- MAIN DASHBOARD GRID -->
+
+    <section class="main-grid">
+
+
+      <!-- DIGIT CHART -->
+
+      <div class="chart-card">
+
+        <div class="section-header">
+
+          <div>
+            <h3>ANÁLISE DOS DÍGITOS</h3>
+            <p>Distribuição estatística dos últimos resultados</p>
           </div>
-          <span id="chartPrice" class="mono price-tag">—</span>
+
+          <div class="chart-status">
+            <span class="status-dot"></span>
+            <span>ANÁLISE AO VIVO</span>
+          </div>
+
         </div>
-        <canvas id="chartCanvas"></canvas>
+
+
+        <!-- ANALYSIS PERIOD -->
+
+        <div class="analysis-toolbar">
+
+          <div class="analysis-period">
+
+            <label for="analysisMode">Período de análise</label>
+
+            <select id="analysisMode">
+              <option value="ticks">Ticks</option>
+              <option value="seconds">Segundos</option>
+              <option value="minutes">Minutos</option>
+            </select>
+
+          </div>
+
+          <div class="analysis-quantity">
+
+            <label for="analysisQuantity">Quantidade</label>
+
+            <input
+              type="number"
+              id="analysisQuantity"
+              value="200"
+              min="1"
+              max="1000"
+            >
+
+          </div>
+
+          <div class="analysis-total">
+            <span>AMOSTRAS</span>
+            <strong id="analysisSamples">0</strong>
+          </div>
+
+        </div>
+
+
+        <!-- CHART LEGEND -->
+
+        <div class="chart-legend">
+
+          <span>
+            <i class="legend-dot green"></i>
+            Alta frequência
+          </span>
+
+          <span>
+            <i class="legend-dot orange"></i>
+            Frequência média
+          </span>
+
+          <span>
+            <i class="legend-dot red"></i>
+            Baixa frequência
+          </span>
+
+        </div>
+
+
+        <!-- VERTICAL DIGIT CHART -->
+
+        <div class="digit-chart-container">
+
+          <canvas id="chartCanvas"></canvas>
+
+        </div>
+
+
+        <div class="chart-footer">
+
+          <span>Último preço:</span>
+          <strong id="chartPrice">---</strong>
+
+          <span id="recoveryBadge" class="recovery-badge hidden">
+            RECUPERAÇÃO
+          </span>
+
+        </div>
+
       </div>
 
-      <!-- Side Panel -->
-      <div class="side-panel">
-        <!-- Tabs -->
-        <div class="tab-bar">
-          <button id="tabControls" class="tab active" onclick="switchTab('controls')">Controles</button>
-          <button id="tabHistory" class="tab" onclick="switchTab('history')">Histórico (<span id="histCount">0</span>)</button>
+
+
+      <!-- CONTROL PANEL -->
+
+      <aside class="side-panel">
+
+        <!-- PANEL TABS -->
+
+        <div class="panel-tabs">
+
+          <button
+            id="tabControls"
+            class="panel-tab active"
+            onclick="switchTab('controls')">
+            CONTROLO
+          </button>
+
+          <button
+            id="tabHistory"
+            class="panel-tab"
+            onclick="switchTab('history')">
+
+            HISTÓRICO
+
+            <span id="histCount">0</span>
+
+          </button>
+
         </div>
 
-        <!-- Controls Panel -->
+
+        <!-- CONTROLS PANEL -->
+
         <div id="panelControls" class="panel-content">
-          <label class="field-label">Mercado</label>
-          <select id="cfgSymbol" class="input-field">
-            <option value="R_10">Volatility 10</option>
-            <option value="R_25">Volatility 25</option>
-            <option value="R_50">Volatility 50</option>
-            <option value="R_75">Volatility 75</option>
-            <option value="R_100">Volatility 100</option>
-            <option value="1HZ10V">Vol 10 (1s)</option>
-            <option value="1HZ25V">Vol 25 (1s)</option>
-            <option value="1HZ50V">Vol 50 (1s)</option>
-            <option value="1HZ75V">Vol 75 (1s)</option>
-            <option value="1HZ100V">Vol 100 (1s)</option>
-          </select>
 
-          <label class="field-label">Dígito (Differs)</label>
-          <div class="digit-grid" id="digitGrid"></div>
+          <div class="strategy-heading">
 
-          <div class="field">
-            <label class="field-label">Stake Inicial</label>
-            <div class="input-wrap"><input id="cfgStake" type="number" value="0.35" step="0.05" min="0.35" class="input-field mono"><span class="suffix">USD</span></div>
-          </div>
-
-          <div id="liveStake" class="live-stake" style="display:none">
-            <span class="label">Stake Atual</span>
-            <span id="liveStakeVal" class="value mono">0.35 USD</span>
-          </div>
-
-          <div class="two-col">
-            <div class="field"><label class="field-label">Stop Loss</label>
-              <div class="input-wrap"><input id="cfgSL" type="number" value="10" class="input-field mono"><span class="suffix">USD</span></div>
+            <div>
+              <span class="small-label">ESTRATÉGIA ACTIVA</span>
+              <h3>DIGIT DIFFERS</h3>
             </div>
-            <div class="field"><label class="field-label">Take Profit</label>
-              <div class="input-wrap"><input id="cfgTP" type="number" value="50" class="input-field mono"><span class="suffix">USD</span></div>
+
+            <span class="strategy-badge">DIGITDIFF</span>
+
+          </div>
+
+
+          <!-- SELECTED DIGIT -->
+
+          <div class="digit-selection">
+
+            <div class="digit-selection-heading">
+              <span>DÍGITO DE ENTRADA</span>
+              <span>0 — 9</span>
             </div>
+
+            <div id="digitGrid" class="digit-grid"></div>
+
           </div>
 
-          <div class="field">
-            <label class="field-label">Meta Diária</label>
-            <div class="input-wrap"><input id="cfgDaily" type="number" value="100" class="input-field mono"><span class="suffix">USD</span></div>
-          </div>
 
-          <div class="section-divider"></div>
-          <h3 class="section-title">MARTINGALE</h3>
-          <div class="two-col">
-            <div class="field"><label class="field-label">Multiplicador</label>
-              <div class="input-wrap"><input id="cfgMult" type="number" value="2.2" step="0.1" class="input-field mono"><span class="suffix">x</span></div>
+          <!-- BOT STATUS -->
+
+          <div class="bot-status-box">
+
+            <div class="bot-status-row">
+              <span>Estado do robô</span>
+              <strong id="botStatusText">PARADO</strong>
             </div>
-            <div class="field"><label class="field-label">Máx Passos</label><input id="cfgMaxSteps" type="number" value="5" class="input-field mono"></div>
+
+            <div class="bot-status-row">
+              <span>Stake actual</span>
+              <strong id="liveStakeVal">0.35 USD</strong>
+            </div>
+
+            <div id="liveStake" class="stake-progress">
+              <div class="stake-progress-fill"></div>
+            </div>
+
+            <div id="recoveryInfo" class="recovery-info">
+              Recuperação desactivada
+            </div>
+
+            <div id="recoveryDetail" class="recovery-detail"></div>
+
           </div>
 
-          <div id="recoveryInfo" class="recovery-info" style="display:none">
-            <div class="ri-title">⚠️ Modo Recuperação Ativo</div>
-            <div id="recoveryDetail" class="ri-detail"></div>
+
+          <!-- START / STOP -->
+
+          <button
+            id="btnStart"
+            class="btn-start"
+            onclick="toggleBot()">
+
+            <span id="botButtonIcon">▶</span>
+            <span id="botButtonText">INICIAR ROBÔ</span>
+
+          </button>
+
+
+          <!-- SETTINGS BUTTON -->
+
+          <button
+            id="btnOpenSettings"
+            class="settings-open-btn"
+            onclick="openSettings()">
+
+            ⚙ CONFIGURAÇÕES
+
+          </button>
+
+
+          <div class="control-footer">
+            <span class="status-dot"></span>
+            <span id="controlStatus">Sistema pronto</span>
           </div>
 
-          <div class="two-col">
-            <div class="field"><label class="field-label">Duração</label><input id="cfgDuration" type="number" value="1" min="1" class="input-field mono"></div>
-            <div class="field"><label class="field-label">Tipo</label>
-              <select id="cfgDurType" class="input-field">
+        </div>
+
+
+        <!-- HISTORY PANEL -->
+
+        <div id="panelHistory" class="panel-content hidden">
+
+          <div class="history-heading">
+
+            <h3>HISTÓRICO DE OPERAÇÕES</h3>
+
+            <button
+              id="btnResetHistory"
+              class="small-action-btn"
+              onclick="resetHistory()">
+              LIMPAR
+            </button>
+
+          </div>
+
+          <div id="historyList" class="history-list">
+
+            <div class="empty-history">
+              Nenhuma operação realizada.
+            </div>
+
+          </div>
+
+        </div>
+
+      </aside>
+
+    </section>
+
+
+    <!-- BOTTOM STATUS -->
+
+    <footer class="dashboard-footer">
+
+      <div class="footer-left">
+        <span class="status-dot"></span>
+        <span>TradeProJB</span>
+        <span class="footer-version">V2.0</span>
+      </div>
+
+      <div class="footer-right">
+        <span>Mercado:</span>
+        <strong id="footerMarket">R_10</strong>
+      </div>
+
+    </footer>
+
+  </main>
+
+
+
+  <!-- ================= SETTINGS MODAL ================= -->
+
+  <div id="settingsModal" class="modal-overlay hidden">
+
+    <div class="settings-modal">
+
+      <div class="modal-header">
+
+        <div>
+          <span class="small-label">TRADEPROJB</span>
+          <h2>Configurações</h2>
+        </div>
+
+        <button
+          class="modal-close"
+          onclick="closeSettings()"
+          aria-label="Fechar configurações">
+          ×
+        </button>
+
+      </div>
+
+
+      <div class="settings-body">
+
+
+        <!-- FINANCIAL SETTINGS -->
+
+        <section class="settings-section">
+
+          <h3>GESTÃO FINANCEIRA</h3>
+
+          <div class="settings-grid">
+
+            <div class="setting-field">
+              <label for="cfgStake">Stake inicial (USD)</label>
+              <input
+                type="number"
+                id="cfgStake"
+                value="0.35"
+                min="0.35"
+                step="0.01">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgSL">Stop Loss (USD)</label>
+              <input
+                type="number"
+                id="cfgSL"
+                value="10"
+                min="0.01"
+                step="0.01">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgTP">Take Profit (USD)</label>
+              <input
+                type="number"
+                id="cfgTP"
+                value="50"
+                min="0.01"
+                step="0.01">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgDaily">Meta diária (USD)</label>
+              <input
+                type="number"
+                id="cfgDaily"
+                value="100"
+                min="0"
+                step="0.01">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgMaxStake">Stake máxima (USD)</label>
+              <input
+                type="number"
+                id="cfgMaxStake"
+                value="5"
+                min="0.35"
+                step="0.01">
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- RECOVERY SETTINGS -->
+
+        <section class="settings-section">
+
+          <h3>RECUPERAÇÃO</h3>
+
+          <label class="toggle-setting">
+            <span>
+              <strong>Activar recuperação</strong>
+              <small>Configuração para uma etapa posterior</small>
+            </span>
+
+            <input type="checkbox" id="cfgRecoveryEnabled">
+            <span class="toggle-slider"></span>
+          </label>
+
+          <div class="settings-grid">
+
+            <div class="setting-field">
+              <label for="cfgMult">Multiplicador</label>
+              <input
+                type="number"
+                id="cfgMult"
+                value="1"
+                min="1"
+                step="0.1">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgMaxSteps">Máximo de etapas</label>
+              <input
+                type="number"
+                id="cfgMaxSteps"
+                value="2"
+                min="1"
+                max="10">
+            </div>
+
+          </div>
+
+          <p class="settings-note">
+            A recuperação será implementada posteriormente,
+            usando EVEN/ODD e mantendo a mesma stake.
+          </p>
+
+        </section>
+
+
+        <!-- CONTRACT SETTINGS -->
+
+        <section class="settings-section">
+
+          <h3>DURAÇÃO DO CONTRATO</h3>
+
+          <div class="settings-grid">
+
+            <div class="setting-field">
+              <label for="cfgDuration">Duração</label>
+              <input
+                type="number"
+                id="cfgDuration"
+                value="1"
+                min="1">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgDurType">Unidade</label>
+
+              <select id="cfgDurType">
                 <option value="t">Ticks</option>
                 <option value="s">Segundos</option>
                 <option value="m">Minutos</option>
               </select>
+
             </div>
-          </div>
-        </div>
 
-        <!-- History Panel -->
-        <div id="panelHistory" class="panel-content" style="display:none">
-          <div id="historyList" class="history-list">
-            <div class="empty-state">Nenhum trade realizado ainda</div>
           </div>
-        </div>
 
-        <!-- START / STOP BUTTONS -->
-        <div class="action-bar">
-          <button id="btnStart" class="btn-start" onclick="startBot()">▶ Iniciar Bot</button>
-          <button id="btnStop" class="btn-stop" onclick="stopBot()" style="display:none">⏹ Parar Bot</button>
-        </div>
+        </section>
+
+
+        <!-- STATISTICAL FILTERS -->
+
+        <section class="settings-section">
+
+          <h3>FILTROS ESTATÍSTICOS</h3>
+
+          <div class="settings-grid">
+
+            <div class="setting-field">
+              <label for="cfgWindowSize">Janela anti-repetição</label>
+              <input
+                type="number"
+                id="cfgWindowSize"
+                value="20"
+                min="5"
+                max="1000">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgMaxRepeat">Repetições máximas</label>
+              <input
+                type="number"
+                id="cfgMaxRepeat"
+                value="3"
+                min="1"
+                max="20">
+            </div>
+
+            <div class="setting-field">
+              <label for="cfgCooldown">Pausa após bloqueio</label>
+              <input
+                type="number"
+                id="cfgCooldown"
+                value="3"
+                min="0"
+                max="100">
+            </div>
+
+          </div>
+
+        </section>
+
+
       </div>
+
+
+      <div class="modal-footer">
+
+        <button
+          class="btn-secondary"
+          onclick="closeSettings()">
+          CANCELAR
+        </button>
+
+        <button
+          id="btnSaveSettings"
+          class="btn-save"
+          onclick="saveSettings()">
+          GUARDAR CONFIGURAÇÕES
+        </button>
+
+      </div>
+
     </div>
+
   </div>
+
+
 </div>
+
+</body>
+</html>

@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
-app_id = SEU_APP_ID;
+// CONFIGURAÇÃO DA DERIV
+const APP_ID = 1089;
+const WS_URL = `wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`;
 let accountType = "demo";
 let ws = null,
   reqId = 0,
@@ -186,7 +188,7 @@ function wsSend(payload) {
 //================== CONNECT WS ====================
 function connectWS(token) {
   return new Promise(function (resolve, reject) {
-    ws = new WebSocket("wss://ws.derivws.com/websockets/v3?app_id=1089");
+    ws = new WebSocket(WS_URL);
     ws.onopen = function () {
       wsSend({ authorize: token })
         .then(function (d) {
@@ -227,7 +229,7 @@ function connectWS(token) {
 
 //==================== LOGINWITHDERIV ===================
 function loginWithDeriv() {
-  const appId = 1089;
+  const appId = APP_ID;
 
   const redirectUri = encodeURIComponent(window.location.origin);
 

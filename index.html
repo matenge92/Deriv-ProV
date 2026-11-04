@@ -105,6 +105,26 @@
           <span id="headerLoginId">---</span>
           <strong id="headerBalance">0.00 USD</strong>
         </div>
+        
+<div class="account-selector">
+
+  <label for="accountSelect">Conta Deriv</label>
+
+  <select id="accountSelect" disabled>
+    <option value="">A carregar contas...</option>
+  </select>
+
+  <button
+    id="btnConnectAccount"
+    class="btn-deriv"
+    type="button"
+    onclick="connectSelectedAccount()"
+    disabled>
+    LIGAR CONTA
+  </button>
+
+</div>
+
 
         <button class="icon-btn disconnect-btn"
           onclick="handleDisconnect()"

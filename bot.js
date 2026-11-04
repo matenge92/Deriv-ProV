@@ -17,6 +17,10 @@ const app = {
   status: "idle", // idle | connecting | connected | running
   token: null
 };
+// CONTAS DERIV
+let derivAccounts = [];
+let selectedAccountId = null;
+
 const bot = {
   running: false,
   initialStake: 0.35,
@@ -390,6 +394,7 @@ async function handleDerivOAuthCallback() {
 
     // Guardar o token apenas na memória
     app.token = data.access_token;
+    await loadDerivAccounts();
 
     console.log(
       "TradeProJB: OAuth autorizado com sucesso."
@@ -411,7 +416,115 @@ async function handleDerivOAuthCallback() {
     );
   }
 }
+// ==================== CARREGAR CONTAS DERIV ====================
 
+async function loadDerivAccounts() {
+  const select = $("accountSelect");
+  const connectButton = $("btnConnectAccount");
+
+  if (!app.token) {
+    throw new Error("Token OAuth não disponível.");
+  }
+
+  if (!select) {
+    throw new Error("Selector accountSelect não encontrado no HTML.");
+  }
+
+  select.disabled = true;
+  select.innerHTML = '<option value="">A carregar contas...</option>';
+
+  if (connectButton) connectButton.disabled = true;
+
+  try {
+    const response = await fetch(BACKEND_URL + "/accounts", {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer " + app.token
+      }
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || result.error || "Não foi possível carregar as contas."
+      );
+    }
+
+    derivAccounts = Array.isArray(result.data) ? result.data : [];
+
+    // Mostrar apenas contas activas
+    const activeAccounts = derivAccounts.filter(function (account) {
+      return String(account.status).toLowerCase() === "active";
+    });
+
+    select.innerHTML = "";
+
+    if (activeAccounts.length === 0) {
+      select.innerHTML =
+        '<option value="">Nenhuma conta activa encontrada</option>';
+
+      throw new Error("A Deriv não devolveu contas activas.");
+    }
+
+    activeAccounts.forEach(function (account) {
+      const option = document.createElement("option");
+
+      option.value = account.account_id;
+
+      const type = String(account.account_type || "").toLowerCase();
+      const labelType = type === "demo" ? "DEMO" : "REAL";
+
+      const balance = Number(account.balance || 0).toFixed(2);
+      const currency = account.currency || "USD";
+
+      option.textContent =
+        labelType + " | " +
+        account.account_id + " | " +
+        balance + " " + currency;
+
+      select.appendChild(option);
+    });
+
+    // Seleccionar a conta correspondente ao modo actual
+    let selectedAccount = activeAccounts.find(function (account) {
+      return String(account.account_type).toLowerCase() === accountType;
+    });
+
+    if (!selectedAccount) {
+      selectedAccount = activeAccounts[0];
+    }
+
+    select.value = selectedAccount.account_id;
+    selectedAccountId = selectedAccount.account_id;
+
+    select.disabled = false;
+
+    // Actualizar a selecção quando o utilizador escolher outra conta
+    select.onchange = function () {
+      selectedAccountId = select.value;
+    };
+
+    console.log(
+      "TradeProJB: Contas carregadas:",
+      activeAccounts.length
+    );
+
+    console.log(
+      "TradeProJB: Conta seleccionada:",
+      selectedAccountId
+    );
+
+  } catch (error) {
+    select.innerHTML =
+      '<option value="">Erro ao carregar contas</option>';
+
+    select.disabled = true;
+
+    console.error("Erro ao carregar contas Deriv:", error);
+    throw error;
+  }
+}
 
 // ==================== CHART ====================
 function drawChart() {

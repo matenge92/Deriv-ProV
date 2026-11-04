@@ -164,13 +164,30 @@ function initDigits() {
     g.appendChild(b);
   }
 }
-
-// ==================== ACCOUNT TYPE ====================
 function setAccountType(t) {
   accountType = t;
-  $("btnDemo").className = "toggle-btn" + (t === "demo" ? " active" : "");
-  $("btnReal").className = "toggle-btn" + (t === "real" ? " active-real" : "");
-  $("realWarning").style.display = t === "real" ? "block" : "none";
+
+  $("btnDemo").className =
+    "toggle-btn" + (t === "demo" ? " active" : "");
+
+  $("btnReal").className =
+    "toggle-btn" + (t === "real" ? " active-real" : "");
+
+  $("realWarning").style.display =
+    t === "real" ? "block" : "none";
+
+  // Sincronizar com a conta carregada
+  const account = derivAccounts.find(function (item) {
+    return (
+      String(item.account_type).toLowerCase() === t &&
+      String(item.status).toLowerCase() === "active"
+    );
+  });
+
+  if (account) {
+    selectedAccountId = account.account_id;
+    $("accountSelect").value = account.account_id;
+  }
 }
 
 // ==================== WS ====================
@@ -502,9 +519,18 @@ async function loadDerivAccounts() {
 
     // Actualizar a selecção quando o utilizador escolher outra conta
     select.onchange = function () {
-      selectedAccountId = select.value;
-    };
+  selectedAccountId = select.value;
 
+  const account = derivAccounts.find(function (item) {
+    return item.account_id === selectedAccountId;
+  });
+
+  if (account) {
+    setAccountType(
+      String(account.account_type).toLowerCase()
+    );
+  }
+};
     console.log(
       "TradeProJB: Contas carregadas:",
       activeAccounts.length

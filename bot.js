@@ -227,30 +227,191 @@ function connectWS(token) {
   });
 }
 
-//==================== LOGINWITHDERIV ===================
-function loginWithDeriv() {
-  const appId = APP_ID;
+// ============================================================
+// TRADEPROJB — DERIV OAUTH 2.0 + PKCE
+// ============================================================
 
-  const redirectUri = encodeURIComponent(window.location.origin);
+const DERIV_CLIENT_ID = "34QF0EDN9wbRFeKn7UuDs";
 
-  const url = `https://oauth.deriv.com/oauth2/authorize?app_id=${appId}&redirect_uri=${redirectUri}`;
+const DERIV_REDIRECT_URI =
+  "https://matenge92.github.io/Deriv-ProV/";
 
-  window.location.href = url;
+const BACKEND_URL =
+  "https://tradeprojb-backend.baptistajuniormatenge.workers.dev";
+
+// Codificação Base64 URL-safe
+function base64UrlEncode(bytes) {
+  let binary = "";
+
+  bytes.forEach(function (byte) {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
-//============== LIMPA URL ===========================
-function getOAuthTokenFromURL() {
-  const hash = window.location.hash;
-  if (!hash.includes("access_token")) return null;
+// Gerar valores aleatórios seguros
+function randomBase64Url(byteLength) {
+  const bytes = crypto.getRandomValues(
+    new Uint8Array(byteLength)
+  );
 
-  const params = new URLSearchParams(hash.replace("#", ""));
-  const token = params.get("access_token");
-
-  // limpa URL para não reprocessar login
-  window.history.replaceState({}, document.title, window.location.pathname);
-
-  return token;
+  return base64UrlEncode(bytes);
 }
+
+// Gerar SHA-256 para PKCE
+async function sha256Base64Url(value) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value)
+  );
+
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
+// Iniciar login Deriv
+async function loginWithDeriv() {
+  try {
+    const verifier = randomBase64Url(32);
+    const state = randomBase64Url(16);
+
+    const challenge = await sha256Base64Url(verifier);
+
+    sessionStorage.setItem(
+      "tradeprojb_pkce_verifier",
+      verifier
+    );
+
+    sessionStorage.setItem(
+      "tradeprojb_oauth_state",
+      state
+    );
+
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: DERIV_CLIENT_ID,
+      redirect_uri: DERIV_REDIRECT_URI,
+      scope: "trade account_manage",
+      state: state,
+      code_challenge: challenge,
+      code_challenge_method: "S256"
+    });
+
+    window.location.assign(
+      "https://auth.deriv.com/oauth2/auth?" +
+      params.toString()
+    );
+
+  } catch (error) {
+    console.error("Erro ao iniciar OAuth:", error);
+    alert("Não foi possível iniciar o login da Deriv.");
+  }
+}
+
+// Processar retorno da autenticação
+async function handleDerivOAuthCallback() {
+  const params = new URLSearchParams(
+    window.location.search
+  );
+
+  const code = params.get("code");
+  const returnedState = params.get("state");
+  const oauthError = params.get("error");
+
+  if (oauthError) {
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
+
+    throw new Error(
+      "A Deriv devolveu um erro: " + oauthError
+    );
+  }
+
+  if (!code) return;
+
+  const savedState = sessionStorage.getItem(
+    "tradeprojb_oauth_state"
+  );
+
+  const verifier = sessionStorage.getItem(
+    "tradeprojb_pkce_verifier"
+  );
+
+  window.history.replaceState(
+    {},
+    document.title,
+    window.location.pathname
+  );
+
+  if (
+    !savedState ||
+    returnedState !== savedState ||
+    !verifier
+  ) {
+    throw new Error(
+      "Validação OAuth falhou. Estado inválido ou sessão expirada."
+    );
+  }
+
+  try {
+    const response = await fetch(
+      BACKEND_URL + "/oauth/token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          code: code,
+          code_verifier: verifier
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (
+      !response.ok ||
+      !data.success ||
+      !data.access_token
+    ) {
+      throw new Error(
+        data.error_description ||
+        data.message ||
+        "Falha na autenticação."
+      );
+    }
+
+    // Guardar o token apenas na memória
+    app.token = data.access_token;
+
+    console.log(
+      "TradeProJB: OAuth autorizado com sucesso."
+    );
+
+    console.log(
+      "Token válido por:",
+      data.expires_in,
+      "segundos"
+    );
+
+  } finally {
+    sessionStorage.removeItem(
+      "tradeprojb_pkce_verifier"
+    );
+
+    sessionStorage.removeItem(
+      "tradeprojb_oauth_state"
+    );
+  }
+}
+
 
 // ==================== CHART ====================
 function drawChart() {
@@ -757,5 +918,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   updateUI();
 
-  animateChart();
+  handleDerivOAuthCallback().catch(function (error) {
+    console.error("Erro no retorno OAuth:", error);
+
+    alert(
+      "Falha na autenticação Deriv: " + error.message
+    );
+  });
 });

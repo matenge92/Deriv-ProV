@@ -415,6 +415,10 @@ async function handleDerivOAuthCallback() {
     app.token = data.access_token;
     await loadDerivAccounts();
 
+    // Mostrar o dashboard após autenticação bem-sucedida
+$("loginScreen").style.display = "none";
+$("dashboard").style.display = "";
+
     console.log(
       "TradeProJB: OAuth autorizado com sucesso."
     );

@@ -339,6 +339,38 @@ select:focus {
   font-size: 13px;
 }
 
+/* ================= DERIV ACCOUNT SELECTOR ================= */
+
+.account-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 170px;
+}
+
+.account-selector label {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.account-selector select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--secondary);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.account-selector .btn-deriv {
+  margin-top: 2px;
+  padding: 10px;
+  font-size: 10px;
+}
+
 .icon-btn {
   width: 36px;
   height: 36px;

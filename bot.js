@@ -15,7 +15,9 @@ let animatedPcts = Array(10).fill(0);
 
 const app = {
   status: "idle", // idle | connecting | connected | running
-  token: null
+  token: null,
+  wsReady: false,
+  connectedAccountType: null
 };
 // CONTAS DERIV
 let derivAccounts = [];
@@ -516,6 +518,7 @@ async function loadDerivAccounts() {
     selectedAccountId = selectedAccount.account_id;
 
     select.disabled = false;
+    if (connectButton) connectButton.disabled = false;
 
     // Actualizar a selecção quando o utilizador escolher outra conta
     select.onchange = function () {
@@ -549,6 +552,198 @@ async function loadDerivAccounts() {
 
     console.error("Erro ao carregar contas Deriv:", error);
     throw error;
+  }
+}
+
+
+// ==================== LIGAÇÃO OPTIONS API (OTP) ====================
+// Esta função apenas autentica a ligação WebSocket.
+// Ainda NÃO envia propostas nem executa compras.
+async function connectSelectedAccount() {
+  const button = $("btnConnectAccount");
+
+  if (!app.token) {
+    alert("Faça primeiro o login com a Deriv.");
+    return;
+  }
+
+  if (!selectedAccountId) {
+    alert("Seleccione uma conta Deriv.");
+    return;
+  }
+
+  const account = derivAccounts.find(function (item) {
+    return String(item.account_id) === String(selectedAccountId);
+  });
+
+  if (!account || String(account.status).toLowerCase() !== "active") {
+    alert("A conta seleccionada não está activa.");
+    return;
+  }
+
+  const selectedType = String(account.account_type || "").toLowerCase();
+
+  // Nesta fase, permitir apenas testes Demo.
+  if (selectedType !== "demo") {
+    alert("Por segurança, nesta fase só podemos testar a conta DEMO.");
+    return;
+  }
+
+  if (ws && ws.readyState === WebSocket.OPEN &&
+      app.wsReady && app.connectedAccountType === selectedType) {
+    console.log("TradeProJB: A conta Demo já está ligada.");
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "A LIGAR...";
+  }
+
+  app.status = "connecting";
+  app.wsReady = false;
+  app.connectedAccountType = null;
+
+  if (ws) {
+    try { ws.close(); } catch (_) {}
+    ws = null;
+  }
+
+  try {
+    // Pedir OTP ao Worker. O OTP é temporário e de utilização única.
+    const response = await fetch(BACKEND_URL + "/connect", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + app.token
+      },
+      body: JSON.stringify({
+        account_id: selectedAccountId
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success ||
+        !result.data || !result.data.url) {
+      throw new Error(
+        result.message || result.error ||
+        "O Worker não conseguiu gerar o endereço de ligação."
+      );
+    }
+
+    const socketUrl = result.data.url;
+
+    // Verificação adicional: aceitar apenas WebSocket Demo da Deriv.
+    const parsedUrl = new URL(socketUrl);
+    if (
+      parsedUrl.protocol !== "wss:" ||
+      parsedUrl.hostname !== "api.derivws.com" ||
+      !parsedUrl.pathname.includes("/trading/v1/options/ws/demo") ||
+      !parsedUrl.searchParams.get("otp")
+    ) {
+      throw new Error("A Deriv devolveu um endereço WebSocket Demo inválido.");
+    }
+
+    // Ligar imediatamente: o OTP expira e só pode ser usado uma vez.
+    await new Promise(function (resolve, reject) {
+      let settled = false;
+      const socket = new WebSocket(socketUrl);
+      ws = socket;
+
+      const connectionTimeout = setTimeout(function () {
+        if (!settled) {
+          settled = true;
+          try { socket.close(); } catch (_) {}
+          reject(new Error("Tempo esgotado ao ligar à Deriv."));
+        }
+      }, 20000);
+
+      socket.onopen = function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(connectionTimeout);
+
+        app.wsReady = true;
+        app.status = "connected";
+        app.connectedAccountType = "demo";
+
+        console.log("TradeProJB: WebSocket Options API ligado à conta DEMO.");
+        if (button) {
+          button.disabled = false;
+          button.textContent = "CONTA DEMO LIGADA";
+        }
+        resolve();
+      };
+
+      socket.onmessage = function (event) {
+        let message;
+        try {
+          message = JSON.parse(event.data);
+        } catch (error) {
+          console.warn("TradeProJB: mensagem WebSocket não reconhecida.");
+          return;
+        }
+
+        // Nesta etapa apenas observamos respostas/erros.
+        // Não enviar authorize, proposal ou buy da API antiga.
+        if (message.error) {
+          console.error(
+            "TradeProJB Options API:",
+            message.error.message || "Erro recebido."
+          );
+        } else {
+          console.log(
+            "TradeProJB Options API: mensagem recebida",
+            message.msg_type || "sem msg_type"
+          );
+        }
+      };
+
+      socket.onerror = function () {
+        if (!settled) {
+          settled = true;
+          clearTimeout(connectionTimeout);
+          reject(new Error("Erro ao estabelecer WebSocket com a Deriv."));
+        }
+        console.error("TradeProJB: erro no WebSocket Options API.");
+      };
+
+      socket.onclose = function (event) {
+        app.wsReady = false;
+        app.connectedAccountType = null;
+        if (app.status !== "idle") app.status = "idle";
+
+        if (button) {
+          button.disabled = false;
+          button.textContent = "LIGAR CONTA";
+        }
+
+        console.log(
+          "TradeProJB: WebSocket fechado. Código:",
+          event.code
+        );
+
+        if (!settled) {
+          settled = true;
+          clearTimeout(connectionTimeout);
+          reject(new Error("A ligação WebSocket foi fechada antes de concluir."));
+        }
+      };
+    });
+
+  } catch (error) {
+    app.wsReady = false;
+    app.status = "idle";
+    app.connectedAccountType = null;
+
+    console.error("TradeProJB: falha na ligação Demo:", error);
+    alert("Não foi possível ligar à conta Demo: " + error.message);
+
+    if (button) {
+      button.disabled = false;
+      button.textContent = "LIGAR CONTA";
+    }
   }
 }
 
@@ -997,6 +1192,17 @@ function runBot() {
 // ==================== CONNECT / START / STOP ====================
 
 function startBot() {
+  // BLOQUEIO DE SEGURANÇA:
+  // O motor de operações ainda usa mensagens da API WebSocket antiga (v3).
+  // Não permitir compras até migrarmos e validarmos o protocolo Options API.
+  if (!app.wsReady || app.connectedAccountType !== "demo") {
+    alert("Ligue primeiro uma conta DEMO da Deriv.");
+    return;
+  }
+
+  alert("Ligação Demo confirmada. As operações continuam bloqueadas enquanto migramos o protocolo de negociação para a Options API.");
+  return;
+
   bot.initialStake = parseFloat($("cfgStake").value) || 0.35;
   bot.stopLoss = parseFloat($("cfgSL").value) || 10;
   bot.takeProfit = parseFloat($("cfgTP").value) || 50;
@@ -1043,6 +1249,9 @@ function stopBot() {
 
 function handleDisconnect() {
   bot.running = false;
+  app.wsReady = false;
+  app.connectedAccountType = null;
+  app.status = "idle";
   if (ws) ws.close();
   ws = null;
   ticks = [];

@@ -411,14 +411,16 @@ async function handleDerivOAuthCallback() {
       );
     }
 
-    // Guardar o token apenas na memória
-    app.token = data.access_token;
-    await loadDerivAccounts();
+    // Guardar o token apenas na memória    
+      app.token = data.access_token;
 
-    // Mostrar o dashboard após autenticação bem-sucedida
-$("loginScreen").style.display = "none";
-$("dashboard").style.display = "";
+    // Carregar as contas Deriv
+      await loadDerivAccounts();
 
+// Mostrar o Dashboard após carregar as contas
+$("loginScreen").classList.add("hidden");
+$("dashboard").classList.remove("hidden");
+    
     console.log(
       "TradeProJB: OAuth autorizado com sucesso."
     );

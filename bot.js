@@ -7,6 +7,10 @@ let ws = null,
   reqId = 0,
   pendingReqs = {},
   handlers = {};
+
+let optionsPingTimer = null;
+let optionsPingReqId = 900000;
+
 let ticks = [],
   selectedDigit = 0;
 
@@ -63,6 +67,7 @@ const antiManip = {
   maxRepeat: 3,
   maxFreqPct: 0.45,
   cooldownTrades: 0,
+  cooldownDuration: 3,
 
   pushDigit(quote) {
     const lastDigit = Math.floor(Math.abs(quote * 100)) % 10;
@@ -134,7 +139,7 @@ const antiManip = {
     }
     const check = this.isSuspicious();
     if (check.suspicious) {
-      this.cooldownTrades = 3;
+      this.cooldownTrades = this.cooldownDuration;
       return { skip: true, reason: check.reason };
     }
     return { skip: false, reason: "" };
@@ -166,17 +171,18 @@ function initDigits() {
     g.appendChild(b);
   }
 }
+
+
 function setAccountType(t) {
   accountType = t;
 
   $("btnDemo").className =
-    "toggle-btn" + (t === "demo" ? " active" : "");
+    "account-btn" + (t === "demo" ? " active" : "");
 
   $("btnReal").className =
-    "toggle-btn" + (t === "real" ? " active-real" : "");
+    "account-btn" + (t === "real" ? " active" : "");
 
-  $("realWarning").style.display =
-    t === "real" ? "block" : "none";
+  $("realWarning").classList.toggle("hidden", t !== "real");
 
   // Sincronizar com a conta carregada
   const account = derivAccounts.find(function (item) {
@@ -191,6 +197,7 @@ function setAccountType(t) {
     $("accountSelect").value = account.account_id;
   }
 }
+
 
 // ==================== WS ====================
 function wsSend(payload) {
@@ -675,6 +682,25 @@ async function connectSelectedAccount() {
         app.connectedAccountType = "demo";
 
         console.log("TradeProJB: WebSocket Options API ligado à conta DEMO.");
+        
+        // Manter a ligação Options API activa.««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««
+if (optionsPingTimer) {
+  clearInterval(optionsPingTimer);
+}
+
+optionsPingTimer = setInterval(function () {
+  if (socket.readyState === WebSocket.OPEN) {
+    const pingId = ++optionsPingReqId;
+
+    socket.send(JSON.stringify({
+      ping: 1,
+      req_id: pingId
+    }));
+
+    console.log("TradeProJB: Ping enviado:", pingId);
+  }
+}, 30000);
+        
         if (button) {
           button.disabled = false;
           button.textContent = "CONTA DEMO LIGADA";
@@ -683,28 +709,38 @@ async function connectSelectedAccount() {
       };
 
       socket.onmessage = function (event) {
-        let message;
-        try {
-          message = JSON.parse(event.data);
-        } catch (error) {
-          console.warn("TradeProJB: mensagem WebSocket não reconhecida.");
-          return;
-        }
+  let message;
 
-        // Nesta etapa apenas observamos respostas/erros.
-        // Não enviar authorize, proposal ou buy da API antiga.
-        if (message.error) {
-          console.error(
-            "TradeProJB Options API:",
-            message.error.message || "Erro recebido."
-          );
-        } else {
-          console.log(
-            "TradeProJB Options API: mensagem recebida",
-            message.msg_type || "sem msg_type"
-          );
-        }
-      };
+  try {
+    message = JSON.parse(event.data);
+  } catch (error) {
+    console.warn("TradeProJB: mensagem WebSocket não reconhecida.");
+    return;
+  }
+
+  // Confirmar resposta ao Ping
+  if (message.msg_type === "ping" && message.ping === "pong") {
+    console.log(
+      "TradeProJB: Pong recebido:",
+      message.req_id || "sem req_id"
+    );
+    return;
+  }
+
+  // Nesta etapa apenas observamos respostas/erros.
+  // Não enviar authorize, proposal ou buy da API antiga.
+  if (message.error) {
+    console.error(
+      "TradeProJB Options API:",
+      message.error.message || "Erro recebido."
+    );
+  } else {
+    console.log(
+      "TradeProJB Options API: mensagem recebida",
+      message.msg_type || "sem msg_type"
+    );
+  }
+};
 
       socket.onerror = function () {
         if (!settled) {
@@ -716,6 +752,10 @@ async function connectSelectedAccount() {
       };
 
       socket.onclose = function (event) {
+        if (optionsPingTimer) {
+          clearInterval(optionsPingTimer);
+          optionsPingTimer = null;
+        }
         app.wsReady = false;
         app.connectedAccountType = null;
         if (app.status !== "idle") app.status = "idle";
@@ -926,10 +966,14 @@ animateChart();
 
 // ==================== TABS ====================
 function switchTab(t) {
-  $("tabControls").className = "tab" + (t === "controls" ? " active" : "");
-  $("tabHistory").className = "tab" + (t === "history" ? " active" : "");
-  $("panelControls").style.display = t === "controls" ? "flex" : "none";
-  $("panelHistory").style.display = t === "history" ? "flex" : "none";
+  $("tabControls").className =
+    "panel-tab" + (t === "controls" ? " active" : "");
+
+  $("tabHistory").className =
+    "panel-tab" + (t === "history" ? " active" : "");
+
+  $("panelControls").classList.toggle("hidden", t !== "controls");
+  $("panelHistory").classList.toggle("hidden", t !== "history");
 }
 
 // ==================== UI UPDATE ====================
@@ -1015,6 +1059,97 @@ function addHistoryItem(r) {
     "</div>";
   list.insertBefore(d, list.firstChild);
 }
+
+
+// ==================== SETTINGS ====================
+
+function openSettings() {
+  $("cfgStake").value = bot.initialStake;
+  $("cfgSL").value = bot.stopLoss;
+  $("cfgTP").value = bot.takeProfit;
+  $("cfgDaily").value = bot.dailyTarget;
+
+  $("cfgSymbol").value = bot.symbol;
+  $("cfgDuration").value = bot.duration;
+  $("cfgDurType").value = bot.durationType;
+
+  $("cfgWindowSize").value = antiManip.windowSize;
+  $("cfgMaxRepeat").value = antiManip.maxRepeat;
+  $("cfgCooldown").value = antiManip.cooldownDuration;
+
+  $("settingsModal").classList.remove("hidden");
+}
+
+function closeSettings() {
+  $("settingsModal").classList.add("hidden");
+}
+
+function saveSettings() {
+  const stake = Number($("cfgStake").value);
+  const sl = Number($("cfgSL").value);
+  const tp = Number($("cfgTP").value);
+  const daily = Number($("cfgDaily").value);
+
+  const duration = Number($("cfgDuration").value);
+  const windowSize = Number($("cfgWindowSize").value);
+  const maxRepeat = Number($("cfgMaxRepeat").value);
+  const cooldown = Number($("cfgCooldown").value);
+
+  if (
+    !Number.isFinite(stake) || stake <= 0 ||
+    !Number.isFinite(sl) || sl <= 0 ||
+    !Number.isFinite(tp) || tp <= 0 ||
+    !Number.isFinite(daily) || daily <= 0 ||
+    !Number.isInteger(duration) || duration <= 0 ||
+    !Number.isInteger(windowSize) || windowSize < 5 ||
+    !Number.isInteger(maxRepeat) || maxRepeat < 2 ||
+    !Number.isInteger(cooldown) || cooldown < 0
+  ) {
+    alert("Verifique os valores das configurações. Existem valores inválidos.");
+    return;
+  }
+
+  if (bot.running) {
+    alert("Pare o bot antes de alterar as configurações.");
+    return;
+  }
+
+  bot.initialStake = stake;
+  bot.currentStake = stake;
+  bot.stopLoss = sl;
+  bot.takeProfit = tp;
+  bot.dailyTarget = daily;
+
+  bot.symbol = $("cfgSymbol").value;
+  bot.duration = duration;
+  bot.durationType = $("cfgDurType").value;
+
+  antiManip.windowSize = windowSize;
+  antiManip.maxRepeat = maxRepeat;
+  antiManip.cooldownDuration = cooldown;
+
+  antiManip.digitHistory = [];
+  antiManip.cooldownTrades = 0;
+
+  $("settingsModal").classList.add("hidden");
+
+  updateUI();
+
+  console.log("TradeProJB: Configurações actualizadas.", {
+    stake: bot.initialStake,
+    stopLoss: bot.stopLoss,
+    takeProfit: bot.takeProfit,
+    dailyTarget: bot.dailyTarget,
+    symbol: bot.symbol,
+    duration: bot.duration,
+    windowSize: antiManip.windowSize,
+    maxRepeat: antiManip.maxRepeat,
+    cooldown: antiManip.cooldownDuration
+  });
+
+  alert("Configurações guardadas com sucesso.");
+}
+
 
 // ==================== BOT LOGIC ====================
 function roundUp05(v) {
@@ -1258,6 +1393,12 @@ function handleDisconnect() {
   app.wsReady = false;
   app.connectedAccountType = null;
   app.status = "idle";
+
+  if (optionsPingTimer) {
+    clearInterval(optionsPingTimer);
+    optionsPingTimer = null;
+  }
+
   if (ws) ws.close();
   ws = null;
   ticks = [];
@@ -1265,7 +1406,6 @@ function handleDisconnect() {
   $("dashboard").style.display = "none";
   $("loginScreen").style.display = "flex";
 }
-
 // ==================== DOM READY ====================
 document.addEventListener("DOMContentLoaded", function () {
   initDigits();

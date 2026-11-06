@@ -198,7 +198,6 @@ function setAccountType(t) {
   }
 }
 
-
 // ==================== WS ====================
 function wsSend(payload) {
   return new Promise(function (resolve, reject) {

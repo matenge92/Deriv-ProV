@@ -1329,6 +1329,14 @@ function runBot() {
     });
 }
 
+function toggleBot() {
+  if (bot.running) {
+    stopBot();
+  } else {
+    startBot();
+  }
+}
+
 // ==================== CONNECT / START / STOP ====================
 
 function startBot() {

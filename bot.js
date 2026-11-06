@@ -682,7 +682,26 @@ async function connectSelectedAccount() {
 
         console.log("TradeProJB: WebSocket Options API ligado à conta DEMO.");
         
-        // Manter a ligação Options API activa.««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««««
+        // Consultar instrumentos disponíveis
+        socket.send(JSON.stringify({
+          active_symbols: "brief",
+          req_id: 1001
+        }));
+
+        console.log("TradeProJB: Pedido de instrumentos enviado.");
+
+        // Consultar contratos do instrumento configurado
+        socket.send(JSON.stringify({
+          contracts_for: bot.symbol,
+          req_id: 1002
+        }));
+
+        console.log(
+          "TradeProJB: Pedido de contratos enviado para:",
+          bot.symbol
+        );
+        
+        // Manter a ligação Options API activa.
 if (optionsPingTimer) {
   clearInterval(optionsPingTimer);
 }
@@ -707,7 +726,8 @@ optionsPingTimer = setInterval(function () {
         resolve();
       };
 
-      socket.onmessage = function (event) {
+      
+socket.onmessage = function (event) {
   let message;
 
   try {
@@ -717,7 +737,7 @@ optionsPingTimer = setInterval(function () {
     return;
   }
 
-  // Confirmar resposta ao Ping
+  // 1. Confirmar resposta ao Ping
   if (message.msg_type === "ping" && message.ping === "pong") {
     console.log(
       "TradeProJB: Pong recebido:",
@@ -726,19 +746,77 @@ optionsPingTimer = setInterval(function () {
     return;
   }
 
-  // Nesta etapa apenas observamos respostas/erros.
-  // Não enviar authorize, proposal ou buy da API antiga.
+  // 4. Erros da API
   if (message.error) {
     console.error(
       "TradeProJB Options API:",
       message.error.message || "Erro recebido."
     );
-  } else {
-    console.log(
-      "TradeProJB Options API: mensagem recebida",
-      message.msg_type || "sem msg_type"
-    );
+    return;
   }
+
+  // 2. Resposta: instrumentos disponíveis
+  if (message.msg_type === "active_symbols") {
+    const symbols = message.active_symbols || [];
+
+    console.log(
+      "TradeProJB: Instrumentos disponíveis:",
+      symbols.length
+    );
+
+    console.table(
+      symbols.map(function (item) {
+        return {
+          símbolo: item.underlying_symbol,
+          nome: item.underlying_symbol_name,
+          mercado: item.market,
+          aberto: item.exchange_is_open,
+          suspenso: item.is_trading_suspended
+        };
+      })
+    );
+    return;
+  }
+
+  // 3. Resposta: contratos disponíveis
+  if (message.msg_type === "contracts_for") {
+    const contracts =
+      message.contracts_for &&
+      message.contracts_for.available
+        ? message.contracts_for.available
+        : [];
+
+    console.log(
+      "TradeProJB: Contratos disponíveis:",
+      contracts.length,
+      "para",
+      message.echo_req
+        ? message.echo_req.contracts_for
+        : "símbolo desconhecido"
+    );
+
+    console.table(
+      contracts.map(function (item) {
+        return {
+          contrato: item.contract_type,
+          categoria: item.contract_category,
+          mercado: item.market,
+          duração_minima: item.min_contract_duration,
+          duração_máxima: item.max_contract_duration,
+          barreiras: item.barriers,
+          sentimento: item.sentiment
+        };
+      })
+    );
+    return;
+  }
+
+  
+  // 5. Outras mensagens
+  console.log(
+    "TradeProJB Options API: mensagem recebida",
+    message.msg_type || "sem msg_type"
+  );
 };
 
       socket.onerror = function () {

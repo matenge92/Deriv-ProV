@@ -696,10 +696,16 @@ async function connectSelectedAccount() {
           req_id: 1002
         }));
 
-        console.log(
-          "TradeProJB: Pedido de contratos enviado para:",
-          bot.symbol
-        );
+        console.log("TradeProJB: Pedido de contratos enviado para:", bot.symbol);
+
+        // Subscrever fluxo de ticks em tempo real
+        socket.send(JSON.stringify({
+          ticks: bot.symbol,
+          subscribe: 1,
+          req_id: 1003
+        }));
+
+        console.log("TradeProJB: Pedido de subscrição de ticks enviado para:", bot.symbol);
         
         // Manter a ligação Options API activa.
 if (optionsPingTimer) {

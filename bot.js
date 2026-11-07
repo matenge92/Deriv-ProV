@@ -875,9 +875,9 @@ if (message.msg_type === "tick" && message.tick) {
     symbol: tick.symbol
   });
 
-  if (ticks.length > 200) {
-    ticks.shift();
-  }
+  if (ticks.length > 1000) {
+  ticks.shift();
+}
   
   // Actualizar contador de amostras em tempo real
 const samplesElement = $("analysisSamples");
@@ -982,7 +982,7 @@ function drawChart() {
   // ÚLTIMOS TICKS
   // ==========================
 
-  const recentTicks = ticks.slice(-200);
+  const recentTicks = getAnalysisTicks();
 
   const digits = Array(10).fill(0);
 

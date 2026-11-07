@@ -546,16 +546,18 @@ async function loadDerivAccounts() {
 
     // Actualizar a selecção quando o utilizador escolher outra conta
     select.onchange = function () {
-  selectedAccountId = select.value;
+  const chosenAccountId = select.value;
 
   const account = derivAccounts.find(function (item) {
-    return item.account_id === selectedAccountId;
+    return item.account_id === chosenAccountId;
   });
 
   if (account) {
-    setAccountType(
-      String(account.account_type).toLowerCase()
-    );
+    setAccountType(String(account.account_type).toLowerCase());
+
+    // Restaurar a conta que o utilizador escolheu
+    selectedAccountId = chosenAccountId;
+    select.value = chosenAccountId;
   }
 };
     console.log(

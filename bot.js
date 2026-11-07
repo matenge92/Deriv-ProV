@@ -631,6 +631,11 @@ ticks = [];
 antiManip.digitHistory = [];
 antiManip.cooldownTrades = 0;
 
+const samplesElement = $("analysisSamples");
+if (samplesElement) {
+  samplesElement.textContent = "0";
+}
+
 bot.manipulationDetected = false;
 
   if (ws) {
@@ -873,6 +878,13 @@ if (message.msg_type === "tick" && message.tick) {
   if (ticks.length > 200) {
     ticks.shift();
   }
+  
+  // Actualizar contador de amostras em tempo real
+const samplesElement = $("analysisSamples");
+
+if (samplesElement) {
+  samplesElement.textContent = ticks.length;
+}
 
   // Alimentar o filtro com o mesmo dígito
   antiManip.pushDigit(digit);

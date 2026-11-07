@@ -1160,6 +1160,12 @@ function updateUI() {
     $("recoveryDetail").textContent =
       "Usando " + bot.contractType + " • " + bot.losses + " losses seguidos";
   $("histCount").textContent = bot.history.length;
+  // Actualizar quantidade de ticks recebidos
+const samplesElement = $("analysisSamples");
+
+if (samplesElement) {
+  samplesElement.textContent = ticks.length;
+}
 
   var am = $("statAntiManip");
   if (bot.manipulationDetected) {

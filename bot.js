@@ -69,13 +69,19 @@ const antiManip = {
   cooldownTrades: 0,
   cooldownDuration: 3,
 
-  pushDigit(quote) {
-    const lastDigit = Math.floor(Math.abs(quote * 100)) % 10;
-    this.digitHistory.push(lastDigit);
-    if (this.digitHistory.length > this.windowSize * 2) {
-      this.digitHistory = this.digitHistory.slice(-this.windowSize);
-    }
-  },
+  pushDigit(digit) {
+  const lastDigit = Number(digit);
+
+  if (!Number.isInteger(lastDigit) || lastDigit < 0 || lastDigit > 9) {
+    return;
+  }
+
+  this.digitHistory.push(lastDigit);
+
+  if (this.digitHistory.length > this.windowSize * 2) {
+    this.digitHistory = this.digitHistory.slice(-this.windowSize);
+  }
+},
 
   isSuspicious() {
     if (this.digitHistory.length < this.windowSize)
@@ -237,7 +243,13 @@ function connectWS(token) {
         if (ticks.length > 100) ticks.shift();
 
         //************GRÁFICO DE BARRAS***************
-        antiManip.pushDigit(d.tick.quote);
+        const pipSize = Number(d.tick.pip_size);
+const formattedQuote = Math.abs(Number(d.tick.quote)).toFixed(pipSize);
+const digit = Number(
+  formattedQuote.charAt(formattedQuote.length - 1)
+);
+
+antiManip.pushDigit(digit);
         $("chartPrice").textContent = d.tick.quote.toFixed(4);
       }
       if (d.msg_type === "balance" && d.balance) {
@@ -612,9 +624,12 @@ async function connectSelectedAccount() {
     button.textContent = "A LIGAR...";
   }
 
-  app.status = "connecting";
-  app.wsReady = false;
-  app.connectedAccountType = null;
+  // Limpar dados da ligação anterior
+ticks = [];
+antiManip.digitHistory = [];
+antiManip.cooldownTrades = 0;
+
+bot.manipulationDetected = false;
 
   if (ws) {
     try { ws.close(); } catch (_) {}
@@ -791,6 +806,7 @@ socket.onmessage = function (event) {
       message.contracts_for.available
         ? message.contracts_for.available
         : [];
+    
 
     console.log(
       "TradeProJB: Contratos disponíveis:",
@@ -817,6 +833,57 @@ socket.onmessage = function (event) {
     return;
   }
 
+  // 4.1. Processar ticks da Options API
+if (message.msg_type === "tick" && message.tick) {
+  const tick = message.tick;
+
+  const quote = Number(tick.quote);
+  const pipSize = Number(tick.pip_size);
+
+  if (
+    !Number.isFinite(quote) ||
+    !Number.isInteger(pipSize) ||
+    pipSize < 0 ||
+    pipSize > 10
+  ) {
+    console.warn("TradeProJB: Tick com valores inválidos.", tick);
+    return;
+  }
+
+  // Calcular o último dígito respeitando as casas decimais do símbolo
+  const formattedQuote = Math.abs(quote).toFixed(pipSize);
+  const digit = Number(
+    formattedQuote.charAt(formattedQuote.length - 1)
+  );
+
+  if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
+    return;
+  }
+
+  // Guardar cotação e dígito calculado
+  ticks.push({
+    quote,
+    digit,
+    epoch: tick.epoch,
+    symbol: tick.symbol
+  });
+
+  if (ticks.length > 200) {
+    ticks.shift();
+  }
+
+  // Alimentar o filtro com o mesmo dígito
+  antiManip.pushDigit(digit);
+
+  // Actualizar o preço no painel
+  const priceElement = $("chartPrice");
+
+  if (priceElement) {
+    priceElement.textContent = quote.toFixed(pipSize);
+  }
+
+  return;
+}
   
   // 5. Outras mensagens
   console.log(
@@ -906,10 +973,14 @@ function drawChart() {
   const digits = Array(10).fill(0);
 
   recentTicks.forEach(function (t) {
-    const digit = Math.floor(Math.abs(t.quote * 100)) % 10;
+  const digit = Number.isInteger(t.digit)
+    ? t.digit
+    : Math.floor(Math.abs(t.quote * 100)) % 10;
 
+  if (digit >= 0 && digit <= 9) {
     digits[digit]++;
-  });
+  }
+});
 
   // ==========================
   // RANKING

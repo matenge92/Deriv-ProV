@@ -1399,14 +1399,12 @@ function addHistoryItem(r) {
 
 
 // ==================== SETTINGS ====================
-
 function openSettings() {
   $("cfgStake").value = bot.initialStake;
   $("cfgSL").value = bot.stopLoss;
   $("cfgTP").value = bot.takeProfit;
   $("cfgDaily").value = bot.dailyTarget;
 
-  $("cfgSymbol").value = bot.symbol;
   $("cfgDuration").value = bot.duration;
   $("cfgDurType").value = bot.durationType;
 
@@ -1415,7 +1413,7 @@ function openSettings() {
   $("cfgCooldown").value = antiManip.cooldownDuration;
 
   $("settingsModal").classList.remove("hidden");
-}
+} 
 
 function closeSettings() {
   $("settingsModal").classList.add("hidden");

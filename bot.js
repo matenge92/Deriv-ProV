@@ -1649,6 +1649,8 @@ function handleDisconnect() {
   selectedAccountId = null;
 
   console.log("TradeProJB: Sessão desligada. Regresso ao login.");
+  console.log("Desligamento executado.");
+console.log("Login encontrado:", $("loginScreen"));
 }
 
 // ==================== DOM READY ====================

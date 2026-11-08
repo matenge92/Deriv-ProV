@@ -883,7 +883,7 @@ if (message.msg_type === "tick" && message.tick) {
 const samplesElement = $("analysisSamples");
 
 if (samplesElement) {
-  samplesElement.textContent = ticks.length;
+  samplesElement.textContent = getAnalysisTicks().length;
 }
 
   // Alimentar o filtro com o mesmo dígito
@@ -966,7 +966,9 @@ function getAnalysisTicks() {
 
   const quantity = Math.max(
     1,
-    Number($("analysisQuantity")?.value) || 200
+    Math.min(1000, Math.floor(
+      Number($("analysisQuantity")?.value) || 200
+    ))
   );
 
   if (!ticks.length) return [];
@@ -976,18 +978,27 @@ function getAnalysisTicks() {
     return ticks.slice(-quantity);
   }
 
-  // Referência temporal: último tick recebido
-  const latestEpoch = ticks[ticks.length - 1].epoch;
+  // Obter apenas ticks com época válida
+  const validTicks = ticks.filter(t =>
+    Number.isFinite(Number(t.epoch))
+  );
 
-  // MODO SEGUNDOS
+  if (!validTicks.length) return [];
+
+  // Referência temporal do último tick recebido
+  const latestEpoch = Number(
+    validTicks[validTicks.length - 1].epoch
+  );
+
   const durationSeconds =
     mode === "seconds" ? quantity : quantity * 60;
 
   const cutoff = latestEpoch - durationSeconds;
 
-  return ticks.filter(t => t.epoch >= cutoff);
+  return validTicks.filter(t =>
+    Number(t.epoch) >= cutoff
+  );
 }
-
 // ==================== CHART ====================
 function drawChart() {
   const canvas = $("chartCanvas");

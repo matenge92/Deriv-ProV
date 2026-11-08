@@ -19,6 +19,7 @@ let animatedPcts = Array(10).fill(0);
 
 let activeTickSubscriptionId = null;
 let activeTickSymbol = null;
+let pendingSymbolChange = null;
 
 const app = {
   status: "idle", // idle | connecting | connected | running
@@ -845,12 +846,24 @@ socket.onmessage = function (event) {
 
   // 4.1. Processar ticks da Options API
 if (message.msg_type === "tick" && message.tick) {
-  
-  if (message.subscription?.id) {
-  activeTickSubscriptionId = message.subscription.id;
-  activeTickSymbol = message.tick.symbol;
-}
+
   const tick = message.tick;
+
+  // Ignorar ticks de índices diferentes do configurado.
+  if (tick.symbol !== bot.symbol) {
+    return;
+  }
+
+  if (message.subscription?.id) {
+    activeTickSubscriptionId = message.subscription.id;
+    activeTickSymbol = tick.symbol;
+    pendingSymbolChange = null;
+
+    console.log(
+      "TradeProJB: Subscrição activa:",
+      activeTickSymbol
+    );
+  }
 
   const quote = Number(tick.quote);
   const pipSize = Number(tick.pip_size);
@@ -964,6 +977,100 @@ if (samplesElement) {
     }
   }
 }
+
+
+// ============================================================
+// TRADEPROJB — GESTÃO DINÂMICA DA SUBSCRIÇÃO DE TICKS
+// ============================================================
+
+async function changeSymbolSubscription(newSymbol) {
+  if (!newSymbol || newSymbol === activeTickSymbol) {
+    return;
+  }
+
+  if (
+    !ws ||
+    ws.readyState !== WebSocket.OPEN ||
+    !app.wsReady ||
+    app.connectedAccountType !== "demo"
+  ) {
+    console.log(
+      "TradeProJB: Índice guardado. Será subscrito na próxima ligação."
+    );
+    return;
+  }
+
+  if (bot.running) {
+    alert("Pare o bot antes de mudar de índice.");
+    return;
+  }
+
+  const socket = ws;
+  const previousSubscriptionId = activeTickSubscriptionId;
+  const previousSymbol = activeTickSymbol;
+
+  try {
+    // Cancelar a subscrição anterior, se existir.
+    if (previousSubscriptionId) {
+      socket.send(JSON.stringify({
+        forget: previousSubscriptionId,
+        req_id: 2001
+      }));
+    }
+
+    // Preparar a nova análise.
+    ticks = [];
+    antiManip.digitHistory = [];
+    antiManip.cooldownTrades = 0;
+
+    activeTickSubscriptionId = null;
+    activeTickSymbol = null;
+
+    animatedBars.fill(0);
+    animatedPcts.fill(0);
+
+    const samplesElement = $("analysisSamples");
+    if (samplesElement) {
+      samplesElement.textContent = "0";
+    }
+
+    const priceElement = $("chartPrice");
+    if (priceElement) {
+      priceElement.textContent = "—";
+    }
+
+    // Consultar contratos do novo índice.
+    socket.send(JSON.stringify({
+      contracts_for: newSymbol,
+      req_id: 2002
+    }));
+
+    // Subscrever os ticks do novo índice.
+    socket.send(JSON.stringify({
+      ticks: newSymbol,
+      subscribe: 1,
+      req_id: 2003
+    }));
+
+    pendingSymbolChange = newSymbol;
+
+    console.log(
+      "TradeProJB: Mudança de índice solicitada:",
+      previousSymbol,
+      "→",
+      newSymbol
+    );
+
+  } catch (error) {
+    console.error(
+      "TradeProJB: Erro ao mudar subscrição:",
+      error
+    );
+
+    alert("Não foi possível solicitar a mudança de índice.");
+  }
+}
+
 
 // ============================================================
 // TRADEPROJB — SELECÇÃO DINÂMICA DE AMOSTRAS

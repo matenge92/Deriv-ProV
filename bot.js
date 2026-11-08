@@ -957,6 +957,37 @@ if (samplesElement) {
   }
 }
 
+// ============================================================
+// TRADEPROJB — SELECÇÃO DINÂMICA DE AMOSTRAS
+// ============================================================
+
+function getAnalysisTicks() {
+  const mode = $("analysisMode")?.value || "ticks";
+
+  const quantity = Math.max(
+    1,
+    Number($("analysisQuantity")?.value) || 200
+  );
+
+  if (!ticks.length) return [];
+
+  // MODO TICKS: últimas N amostras
+  if (mode === "ticks") {
+    return ticks.slice(-quantity);
+  }
+
+  // Referência temporal: último tick recebido
+  const latestEpoch = ticks[ticks.length - 1].epoch;
+
+  // MODO SEGUNDOS
+  const durationSeconds =
+    mode === "seconds" ? quantity : quantity * 60;
+
+  const cutoff = latestEpoch - durationSeconds;
+
+  return ticks.filter(t => t.epoch >= cutoff);
+}
+
 // ==================== CHART ====================
 function drawChart() {
   const canvas = $("chartCanvas");
@@ -984,6 +1015,11 @@ function drawChart() {
 
   const recentTicks = getAnalysisTicks();
 
+  if (recentTicks.length === 0) {
+  animatedBars.fill(0);
+  animatedPcts.fill(0);
+  return;
+}
   const digits = Array(10).fill(0);
 
   recentTicks.forEach(function (t) {
@@ -1172,11 +1208,12 @@ function updateUI() {
     $("recoveryDetail").textContent =
       "Usando " + bot.contractType + " • " + bot.losses + " losses seguidos";
   $("histCount").textContent = bot.history.length;
+  
   // Actualizar quantidade de ticks recebidos
-const samplesElement = $("analysisSamples");
+  const samplesElement = $("analysisSamples");
 
 if (samplesElement) {
-  samplesElement.textContent = ticks.length;
+  samplesElement.textContent = getAnalysisTicks().length;
 }
 
   var am = $("statAntiManip");
@@ -1456,7 +1493,7 @@ function runBot() {
     return Promise.resolve();
   }
 
-  // 🛡️ ANTI-MANIPULATION CHECK
+  // 🛡️ ANTI-MANIPULATION                                                                                                                                                                                                                                                                    CHECK
   var manipCheck = antiManip.shouldSkip();
   if (manipCheck.skip) {
     bot.manipulationDetected = true;
@@ -1584,6 +1621,11 @@ function handleDisconnect() {
   if (ws) ws.close();
   ws = null;
   ticks = [];
+  
+  const samplesElement = $("analysisSamples");
+if (samplesElement) {
+  samplesElement.textContent = "0";
+}
   handlers = {};
   $("dashboard").style.display = "none";
   $("loginScreen").style.display = "flex";
@@ -1601,4 +1643,21 @@ document.addEventListener("DOMContentLoaded", function () {
       "Falha na autenticação Deriv: " + error.message
     );
   });
+  $("analysisMode")?.addEventListener("change", () => {
+  drawChart();
+
+  const samplesElement = $("analysisSamples");
+  if (samplesElement) {
+    samplesElement.textContent = getAnalysisTicks().length;
+  }
+});
+
+$("analysisQuantity")?.addEventListener("input", () => {
+  drawChart();
+
+  const samplesElement = $("analysisSamples");
+  if (samplesElement) {
+    samplesElement.textContent = getAnalysisTicks().length;
+  }
+});
 });

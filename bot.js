@@ -6,7 +6,7 @@ let accountType = "demo";
 let ws = null,
   reqId = 0,
   pendingReqs = {},
-  handlers = {};
+  handlers = {}; 
 
 let optionsPingTimer = null;
 let optionsPingReqId = 900000;

@@ -1457,9 +1457,17 @@ function saveSettings() {
   bot.takeProfit = tp;
   bot.dailyTarget = daily;
 
-  bot.symbol = $("cfgSymbol").value;
-  bot.duration = duration;
-  bot.durationType = $("cfgDurType").value;
+  const previousSymbol = bot.symbol;
+  const newSymbol = $("cfgSymbol").value;
+
+  bot.symbol = newSymbol;
+
+  if (newSymbol !== previousSymbol) {
+    changeSymbolSubscription(newSymbol);
+  }
+
+   bot.duration = duration;
+   bot.durationType = $("cfgDurType").value;
 
   antiManip.windowSize = windowSize;
   antiManip.maxRepeat = maxRepeat;

@@ -1460,6 +1460,11 @@ function saveSettings() {
   const previousSymbol = bot.symbol;
   const newSymbol = $("cfgSymbol").value;
 
+  console.log("TradeProJB: Verificação do índice:", {
+  previousSymbol,
+  selectedSymbol: newSymbol
+});
+
   bot.symbol = newSymbol;
 
   if (newSymbol !== previousSymbol) {

@@ -1641,10 +1641,10 @@ function handleDisconnect() {
 
   // Regressar ao login usando as classes CSS
   $("dashboard").classList.add("hidden");
-$("dashboard").style.display = "none";
+  $("dashboard").style.display = "none";
 
-$("loginScreen").classList.remove("hidden");
-$("loginScreen").style.display = "flex";
+  $("loginScreen").classList.remove("hidden");
+  $("loginScreen").style.display = "flex";
   
   // Limpar estado da conta
   app.token = null;

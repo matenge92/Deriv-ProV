@@ -17,6 +17,9 @@ let ticks = [],
 let animatedBars = Array(10).fill(0);
 let animatedPcts = Array(10).fill(0);
 
+let activeTickSubscriptionId = null;
+let activeTickSymbol = null;
+
 const app = {
   status: "idle", // idle | connecting | connected | running
   token: null,
@@ -842,6 +845,11 @@ socket.onmessage = function (event) {
 
   // 4.1. Processar ticks da Options API
 if (message.msg_type === "tick" && message.tick) {
+  
+  if (message.subscription?.id) {
+  activeTickSubscriptionId = message.subscription.id;
+  activeTickSymbol = message.tick.symbol;
+}
   const tick = message.tick;
 
   const quote = Number(tick.quote);

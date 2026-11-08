@@ -1608,28 +1608,49 @@ function stopBot() {
 }
 
 function handleDisconnect() {
+  // Parar o bot e actualizar o estado
   bot.running = false;
   app.wsReady = false;
   app.connectedAccountType = null;
   app.status = "idle";
 
+  // Parar o Ping
   if (optionsPingTimer) {
     clearInterval(optionsPingTimer);
     optionsPingTimer = null;
   }
 
-  if (ws) ws.close();
-  ws = null;
+  // Fechar WebSocket
+  if (ws) {
+    const socket = ws;
+    ws = null;
+    socket.close();
+  }
+
+  // Limpar dados da sessão
   ticks = [];
-  
-  const samplesElement = $("analysisSamples");
-if (samplesElement) {
-  samplesElement.textContent = "0";
-}
+  antiManip.digitHistory = [];
+  antiManip.cooldownTrades = 0;
   handlers = {};
-  $("dashboard").style.display = "none";
-  $("loginScreen").style.display = "flex";
+
+  // Reiniciar contador
+  const samplesElement = $("analysisSamples");
+  if (samplesElement) {
+    samplesElement.textContent = "0";
+  }
+
+  // Regressar ao login usando as classes CSS
+  $("dashboard").classList.add("hidden");
+  $("loginScreen").classList.remove("hidden");
+
+  // Limpar estado da conta
+  app.token = null;
+  derivAccounts = [];
+  selectedAccountId = null;
+
+  console.log("TradeProJB: Sessão desligada. Regresso ao login.");
 }
+
 // ==================== DOM READY ====================
 document.addEventListener("DOMContentLoaded", function () {
   initDigits();

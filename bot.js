@@ -639,7 +639,6 @@ async function loadDerivAccounts() {
   }
 }
 
-
 // ==================== LIGAÇÃO OPTIONS API (OTP) ====================
 // Esta função apenas autentica a ligação WebSocket.
 // Ainda NÃO envia propostas nem executa compras.
@@ -666,6 +665,8 @@ async function connectSelectedAccount() {
   }
 
   const selectedType = String(account.account_type || "").toLowerCase();
+  
+  const requestedAccountId = String(account.account_id);
 
   // Nesta fase, permitir apenas testes Demo.
   if (selectedType !== "demo") {
@@ -673,11 +674,19 @@ async function connectSelectedAccount() {
     return;
   }
 
-  if (ws && ws.readyState === WebSocket.OPEN &&
-      app.wsReady && app.connectedAccountType === selectedType) {
-    console.log("TradeProJB: A conta Demo já está ligada.");
-    return;
-  }
+  if (
+  ws &&
+  ws.readyState === WebSocket.OPEN &&
+  app.wsReady &&
+  app.connectedAccountType === selectedType &&
+  String(app.connectedAccountId) === requestedAccountId
+) {
+  console.log(
+    "TradeProJB: A conta seleccionada já está ligada:",
+    requestedAccountId
+  );
+  return;
+}
 
   if (button) {
     button.disabled = true;
@@ -696,10 +705,20 @@ if (samplesElement) {
 
 bot.manipulationDetected = false;
 
-  if (ws) {
-    try { ws.close(); } catch (_) {}
-    ws = null;
-  }
+  // Limpar o estado da ligação anterior
+app.wsReady = false;
+app.connectedAccountType = null;
+app.connectedAccountId = null;
+app.status = "connecting";
+
+if (ws) {
+  const previousSocket = ws;
+  ws = null;
+
+  try {
+    previousSocket.close();
+  } catch (_) {}
+}
 
   try {
     // Pedir OTP ao Worker. O OTP é temporário e de utilização única.
@@ -710,8 +729,8 @@ bot.manipulationDetected = false;
         "Authorization": "Bearer " + app.token
       },
       body: JSON.stringify({
-        account_id: selectedAccountId
-      })
+        account_id: requestedAccountId
+      }),
     });
 
     const result = await response.json();
@@ -758,7 +777,8 @@ bot.manipulationDetected = false;
 
         app.wsReady = true;
         app.status = "connected";
-        app.connectedAccountType = "demo";
+        app.connectedAccountType = selectedType;
+        app.connectedAccountId = requestedAccountId;
 
         console.log("TradeProJB: WebSocket Options API ligado à conta DEMO.");
         
@@ -871,7 +891,6 @@ socket.onmessage = function (event) {
     return;
   }
 
-  // 4. Erros da API
   // 4. Erros da API
 if (message.error) {
   const failedReqId = message.req_id;
@@ -1072,14 +1091,21 @@ if (samplesElement) {
       };
 
       socket.onclose = function (event) {
-        if (optionsPingTimer) {
-          clearInterval(optionsPingTimer);
-          optionsPingTimer = null;
-        }
-        app.wsReady = false;
-        app.connectedAccountType = null;
-        if (app.status !== "idle") app.status = "idle";
+  
+        if (ws === socket) {
+          if (optionsPingTimer) {
+      clearInterval(optionsPingTimer);
+      optionsPingTimer = null;
+    }
 
+    app.wsReady = false;
+    app.connectedAccountType = null;
+    app.connectedAccountId = null;
+
+    if (app.status !== "idle") {
+      app.status = "idle";
+    }
+  }   
         if (button) {
           button.disabled = false;
           button.textContent = "LIGAR CONTA";
@@ -1102,6 +1128,7 @@ if (samplesElement) {
     app.wsReady = false;
     app.status = "idle";
     app.connectedAccountType = null;
+    app.connectedAccountId = null;
 
     console.error("TradeProJB: falha na ligação Demo:", error);
     alert("Não foi possível ligar à conta Demo: " + error.message);
@@ -1138,7 +1165,6 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
 // ============================================================
 // TRADEPROJB — GESTÃO DINÂMICA DA SUBSCRIÇÃO DE TICKS
 // ============================================================
-
 
 async function changeSymbolSubscription(newSymbol) {
   if (!newSymbol || newSymbol === activeTickSymbol) {
@@ -1929,6 +1955,7 @@ function handleDisconnect() {
   app.wsReady = false;
   app.connectedAccountType = null;
   app.status = "idle";
+  app.connectedAccountId = null;
 
   // Parar o Ping
   if (optionsPingTimer) {

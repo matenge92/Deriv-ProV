@@ -13,6 +13,8 @@ let optionsPingReqId = 900000;
 // Pedidos de negociação da Options API
 let optionsRequestId = 500000;
 let pendingOptionsRequests = {};
+// Acompanhamento de contratos pela Options API
+let activeContractMonitors = {};
 
 let ticks = [],
   selectedDigit = 0;
@@ -965,6 +967,81 @@ if (message.error) {
   return;
 }
 
+// 5. ACOMPANHAMENTO DOS CONTRATOS OPTIONS API
+if (message.msg_type === "proposal_open_contract") {
+  const contract = message.proposal_open_contract;
+
+  if (contract) {
+    const contractId = String(contract.contract_id);
+    const monitor = activeContractMonitors[contractId];
+
+    if (monitor) {
+      // Guardar o ID da subscrição para posterior cancelamento.
+      if (message.subscription?.id) {
+        monitor.subscriptionId = message.subscription.id;
+      }
+
+      console.log(
+        "TradeProJB: Actualização do contrato:",
+        {
+          contract_id: contractId,
+          status: contract.status,
+          profit: contract.profit,
+          bid_price: contract.bid_price,
+          is_sold: contract.is_sold
+        }
+      );
+
+      try {
+        monitor.onUpdate(contract);
+      } catch (error) {
+        console.error(
+          "TradeProJB: Erro no processamento do contrato:",
+          error
+        );
+      }
+
+      // Detectar o encerramento do contrato.
+      const finished = [
+        "won",
+        "lost",
+        "sold",
+        "cancelled"
+      ].includes(String(contract.status).toLowerCase());
+
+      if (finished || contract.is_sold || contract.is_expired) {
+        const subscriptionId = monitor.subscriptionId;
+
+        delete activeContractMonitors[contractId];
+
+        console.log(
+          "TradeProJB: Contrato terminado:",
+          contractId
+        );
+
+        // Cancelar a subscrição quando existir.
+        if (subscriptionId) {
+          sendOptionsRequest({
+            forget: subscriptionId
+          }).then(function () {
+            console.log(
+              "TradeProJB: Subscrição do contrato cancelada:",
+              subscriptionId
+            );
+          }).catch(function (error) {
+            console.warn(
+              "TradeProJB: Não foi possível cancelar a subscrição:",
+              error.message
+            );
+          });
+        }
+      }
+    }
+  }
+
+  return;
+}  
+
   // 2. Resposta: instrumentos disponíveis
   if (message.msg_type === "active_symbols") {
     const symbols = message.active_symbols || [];
@@ -1189,6 +1266,8 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
   return requestId;
 }
 
+
+
 // ============================================================
 // TRADEPROJB — SISTEMA DE PEDIDOS OPTIONS API
 // ============================================================
@@ -1246,6 +1325,95 @@ function sendOptionsRequest(payload, timeout = 15000) {
       reject(error);
     }
   });
+}
+
+// ============================================================
+// TRADEPROJB — ACOMPANHAMENTO OPTIONS API
+// ============================================================
+
+async function startContractMonitor(contractId, onUpdate) {
+  if (!contractId) {
+    throw new Error("ID do contrato não informado.");
+  }
+
+  if (typeof onUpdate !== "function") {
+    throw new Error("Função de actualização não informada.");
+  }
+
+  const id = String(contractId);
+
+  if (activeContractMonitors[id]) {
+    throw new Error(
+      "Este contrato já está a ser acompanhado."
+    );
+  }
+
+  const response = await sendOptionsRequest({
+    proposal_open_contract: 1,
+    contract_id: Number(contractId),
+    subscribe: 1
+  });
+
+  const contract = response.proposal_open_contract;
+
+  if (!contract || !contract.contract_id) {
+    throw new Error(
+      "A Deriv não devolveu os dados do contrato."
+    );
+  }
+
+  const monitor = {
+    contractId: id,
+    subscriptionId: response.subscription?.id || null,
+    onUpdate: onUpdate
+  };
+
+  activeContractMonitors[id] = monitor;
+
+  console.log(
+    "TradeProJB: Acompanhamento iniciado:",
+    {
+      contract_id: id,
+      subscription_id: monitor.subscriptionId,
+      status: contract.status
+    }
+  );
+
+  // Entregar também a resposta inicial.
+  onUpdate(contract);
+
+  return {
+    contractId: id,
+    subscriptionId: monitor.subscriptionId
+  };
+}
+
+async function stopContractMonitor(contractId) {
+  const id = String(contractId);
+  const monitor = activeContractMonitors[id];
+
+  if (!monitor) {
+    console.warn(
+      "TradeProJB: Contrato não encontrado no acompanhamento:",
+      id
+    );
+    return false;
+  }
+
+  delete activeContractMonitors[id];
+
+  if (monitor.subscriptionId) {
+    await sendOptionsRequest({
+      forget: monitor.subscriptionId
+    });
+  }
+
+  console.log(
+    "TradeProJB: Acompanhamento cancelado:",
+    id
+  );
+
+  return true;
 }
 
 

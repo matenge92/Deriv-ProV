@@ -21,6 +21,11 @@ let activeTickSubscriptionId = null;
 let activeTickSymbol = null;
 let pendingSymbolChange = null;
 
+// Controlo das operações de subscrição
+let subscriptionReqId = 3000;
+let pendingSubscriptionRequests = {};
+let symbolChangeInProgress = false;
+
 const app = {
   status: "idle", // idle | connecting | connected | running
   token: null,
@@ -779,13 +784,48 @@ socket.onmessage = function (event) {
   }
 
   // 4. Erros da API
-  if (message.error) {
+  // 4. Erros da API
+if (message.error) {
+  const failedReqId = message.req_id;
+
+  if (
+    failedReqId &&
+    pendingSubscriptionRequests[failedReqId]
+  ) {
+    const failedRequest =
+      pendingSubscriptionRequests[failedReqId];
+
+    delete pendingSubscriptionRequests[failedReqId];
+
     console.error(
-      "TradeProJB Options API:",
-      message.error.message || "Erro recebido."
+      "TradeProJB: Falha na operação de subscrição:",
+      failedRequest.action,
+      failedRequest.symbol,
+      message.error.message
     );
+
+    if (failedRequest.action === "subscribe") {
+      pendingSymbolChange = null;
+      symbolChangeInProgress = false;
+    }
+
+    alert(
+      "A Deriv não aceitou a operação no índice " +
+      failedRequest.symbol +
+      ": " +
+      message.error.message
+    );
+
     return;
   }
+
+  console.error(
+    "TradeProJB Options API:",
+    message.error.message || "Erro recebido."
+  );
+
+  return;
+}
 
   // 2. Resposta: instrumentos disponíveis
   if (message.msg_type === "active_symbols") {
@@ -855,15 +895,18 @@ if (message.msg_type === "tick" && message.tick) {
   }
 
   if (message.subscription?.id) {
-    activeTickSubscriptionId = message.subscription.id;
+  const newSubscriptionId = message.subscription.id;
+
+  if (newSubscriptionId !== activeTickSubscriptionId) {
+    activeTickSubscriptionId = newSubscriptionId;
     activeTickSymbol = tick.symbol;
-    pendingSymbolChange = null;
 
     console.log(
       "TradeProJB: Subscrição activa:",
       activeTickSymbol
     );
   }
+}
 
   const quote = Number(tick.quote);
   const pipSize = Number(tick.pip_size);
@@ -978,6 +1021,27 @@ if (samplesElement) {
   }
 }
 
+// Enviar pedidos de subscrição com IDs únicos
+function sendSubscriptionRequest(socket, payload, action, symbol) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    throw new Error("WebSocket não está disponível.");
+  }
+
+  const requestId = ++subscriptionReqId;
+
+  pendingSubscriptionRequests[requestId] = {
+    action: action,
+    symbol: symbol,
+    createdAt: Date.now()
+  };
+
+  socket.send(JSON.stringify({
+    ...payload,
+    req_id: requestId
+  }));
+
+  return requestId;
+}
 
 // ============================================================
 // TRADEPROJB — GESTÃO DINÂMICA DA SUBSCRIÇÃO DE TICKS

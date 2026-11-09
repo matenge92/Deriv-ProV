@@ -10,6 +10,9 @@ let ws = null,
 
 let optionsPingTimer = null;
 let optionsPingReqId = 900000;
+// Pedidos de negociação da Options API
+let optionsRequestId = 500000;
+let pendingOptionsRequests = {};
 
 let ticks = [],
   selectedDigit = 0;
@@ -843,6 +846,30 @@ socket.onmessage = function (event) {
     return;
   }
 
+    // Resolver pedidos da Options API
+  const optionsPending = message.req_id
+    ? pendingOptionsRequests[message.req_id]
+    : null;
+
+  if (optionsPending) {
+    delete pendingOptionsRequests[message.req_id];
+
+    clearTimeout(optionsPending.timer);
+
+    if (message.error) {
+      optionsPending.reject(
+        new Error(message.error.message || "Erro da Options API.")
+      );
+    } else {
+      optionsPending.resolve(message);
+    }
+
+    console.log(
+      "TradeProJB: Resposta Options API recebida:",
+      message.req_id,
+      message.msg_type
+    );
+  }
   
   // Confirmar respostas dos pedidos de subscrição
   const completedRequest = message.req_id
@@ -1161,6 +1188,66 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
 
   return requestId;
 }
+
+// ============================================================
+// TRADEPROJB — SISTEMA DE PEDIDOS OPTIONS API
+// ============================================================
+
+function sendOptionsRequest(payload, timeout = 15000) {
+  return new Promise(function (resolve, reject) {
+
+    const socket = ws;
+
+    if (
+      !socket ||
+      socket.readyState !== WebSocket.OPEN ||
+      !app.wsReady ||
+      app.connectedAccountType !== "demo"
+    ) {
+      reject(new Error("Options API não está ligada à conta Demo."));
+      return;
+    }
+
+    const requestId = ++optionsRequestId;
+
+    const timer = setTimeout(function () {
+      if (pendingOptionsRequests[requestId]) {
+        delete pendingOptionsRequests[requestId];
+
+        reject(
+          new Error("Tempo esgotado no pedido Options API: " + requestId)
+        );
+      }
+    }, timeout);
+
+    pendingOptionsRequests[requestId] = {
+      resolve: resolve,
+      reject: reject,
+      timer: timer,
+      createdAt: Date.now(),
+      payload: payload
+    };
+
+    try {
+      socket.send(JSON.stringify({
+        ...payload,
+        req_id: requestId
+      }));
+
+      console.log(
+        "TradeProJB: Pedido Options API enviado:",
+        requestId,
+        payload
+      );
+
+    } catch (error) {
+      clearTimeout(timer);
+      delete pendingOptionsRequests[requestId];
+      reject(error);
+    }
+  });
+}
+
 
 // ============================================================
 // TRADEPROJB — GESTÃO DINÂMICA DA SUBSCRIÇÃO DE TICKS

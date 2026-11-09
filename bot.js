@@ -1266,8 +1266,6 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
   return requestId;
 }
 
-
-
 // ============================================================
 // TRADEPROJB — SISTEMA DE PEDIDOS OPTIONS API
 // ============================================================
@@ -1326,6 +1324,84 @@ function sendOptionsRequest(payload, timeout = 15000) {
     }
   });
 }
+
+
+// ============================================================
+// TRADEPROJB — SOLICITAR PROPOSTA DE CONTRATO
+// Esta função apenas consulta o preço. NÃO compra.
+// ============================================================
+
+async function requestContractProposal() {
+
+  if (!app.wsReady || app.connectedAccountType !== "demo") {
+    throw new Error("É necessário estar ligado à conta Demo.");
+  }
+
+  const account = derivAccounts.find(function (item) {
+    return String(item.account_id) === String(selectedAccountId);
+  });
+
+  if (!account || !account.currency) {
+    throw new Error("Não foi possível identificar a moeda da conta.");
+  }
+
+  const contractType = bot.contractType;
+
+  const digitContracts = [
+    "DIGITDIFF",
+    "DIGITOVER",
+    "DIGITUNDER",
+    "DIGITMATCH"
+  ];
+
+  const payload = {
+    proposal: 1,
+    amount: Number(bot.currentStake),
+    basis: "stake",
+    contract_type: contractType,
+    currency: account.currency,
+    duration: Number(bot.duration),
+    duration_unit: bot.durationType,
+    underlying_symbol: bot.symbol
+  };
+
+  if (digitContracts.includes(contractType)) {
+    const prediction = bot.isRecovery
+      ? recoveryPred(contractType)
+      : bot.prediction;
+
+    payload.barrier = String(prediction);
+  }
+
+  console.log(
+    "TradeProJB: A solicitar proposta:",
+    payload
+  );
+
+  const response = await sendOptionsRequest(payload);
+
+  const proposal = response.proposal;
+
+  if (
+    !proposal ||
+    !proposal.id ||
+    !Number.isFinite(Number(proposal.ask_price))
+  ) {
+    throw new Error("Resposta da proposta incompleta ou inválida.");
+  }
+
+  console.log("TradeProJB: Proposta recebida:", {
+    proposal_id: proposal.id,
+    contract_type: contractType,
+    symbol: bot.symbol,
+    ask_price: proposal.ask_price,
+    payout: proposal.payout,
+    longcode: proposal.longcode
+  });
+
+  return proposal;
+}
+
 
 // ============================================================
 // TRADEPROJB — ACOMPANHAMENTO OPTIONS API

@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const APP_ID = 1089;
 const WS_URL = `wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`;
 let accountType = "demo"; 
-let ws = null,
+let ws = null, 
   reqId = 0,
   pendingReqs = {},
   handlers = {}; 

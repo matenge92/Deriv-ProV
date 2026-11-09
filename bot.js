@@ -30,7 +30,8 @@ const app = {
   status: "idle", // idle | connecting | connected | running
   token: null,
   wsReady: false,
-  connectedAccountType: null
+  connectedAccountType: null,
+  connectedAccountId: null
 };
 // CONTAS DERIV
 let derivAccounts = [];
@@ -188,18 +189,41 @@ function initDigits() {
 }
 
 
-function setAccountType(t) {
+function setAccountType(t, preserveSelection = false) {
+  t = String(t).toLowerCase();
+
+  if (t !== "demo" && t !== "real") {
+    console.warn("TradeProJB: Tipo de conta inválido:", t);
+    return;
+  }
+
   accountType = t;
 
-  $("btnDemo").className =
-    "account-btn" + (t === "demo" ? " active" : "");
+  // Actualizar os botões Demo e Real do dashboard
+  const btnDemo = $("btnDemo");
+  const btnReal = $("btnReal");
+  const realWarning = $("realWarning");
 
-  $("btnReal").className =
-    "account-btn" + (t === "real" ? " active" : "");
+  if (btnDemo) {
+    btnDemo.className =
+      "account-btn" + (t === "demo" ? " active" : "");
+  }
 
-  $("realWarning").classList.toggle("hidden", t !== "real");
+  if (btnReal) {
+    btnReal.className =
+      "account-btn" + (t === "real" ? " active" : "");
+  }
 
-  // Sincronizar com a conta carregada
+  if (realWarning) {
+    realWarning.classList.toggle("hidden", t !== "real");
+  }
+
+  // Preservar a conta escolhida manualmente no selector
+  if (preserveSelection) {
+    return;
+  }
+
+  // Procurar uma conta activa do tipo seleccionado
   const account = derivAccounts.find(function (item) {
     return (
       String(item.account_type).toLowerCase() === t &&
@@ -208,11 +232,33 @@ function setAccountType(t) {
   });
 
   if (account) {
-    selectedAccountId = account.account_id;
-    $("accountSelect").value = account.account_id;
+    selectedAccountId = String(account.account_id);
+
+    const select = $("accountSelect");
+
+    if (select) {
+      select.value = selectedAccountId;
+    }
+
+    console.log("TradeProJB: Tipo de conta seleccionado:", {
+      tipo: accountType,
+      conta: selectedAccountId
+    });
+  } else {
+    selectedAccountId = null;
+
+    const select = $("accountSelect");
+
+    if (select) {
+      select.value = "";
+    }
+
+    console.warn(
+      "TradeProJB: Nenhuma conta activa encontrada para:",
+      t
+    );
   }
 }
-
 // ==================== WS ====================
 function wsSend(payload) {
   return new Promise(function (resolve, reject) {
@@ -558,11 +604,14 @@ async function loadDerivAccounts() {
   const chosenAccountId = select.value;
 
   const account = derivAccounts.find(function (item) {
-    return item.account_id === chosenAccountId;
+    return String(item.account_id) === String(chosenAccountId);
   });
 
   if (account) {
-    setAccountType(String(account.account_type).toLowerCase());
+    setAccountType(
+  String(account.account_type).toLowerCase(),
+  true
+);
 
     // Restaurar a conta que o utilizador escolheu
     selectedAccountId = chosenAccountId;
@@ -774,6 +823,45 @@ socket.onmessage = function (event) {
     return;
   }
 
+  
+  // Confirmar respostas dos pedidos de subscrição
+  const completedRequest = message.req_id
+    ? pendingSubscriptionRequests[message.req_id]
+    : null;
+
+  if (completedRequest && !message.error) {
+    delete pendingSubscriptionRequests[message.req_id];
+
+    console.log(
+      "TradeProJB: Pedido confirmado:",
+      completedRequest.action,
+      completedRequest.symbol,
+      "ID:",
+      message.req_id
+    );
+
+    // Confirmar a nova subscrição de ticks.
+    if (
+      completedRequest.action === "subscribe" &&
+      message.subscription &&
+      message.subscription.id
+    ) {
+      activeTickSubscriptionId = message.subscription.id;
+      activeTickSymbol = completedRequest.symbol;
+
+      pendingSymbolChange = null;
+      symbolChangeInProgress = false;
+
+      console.log(
+        "TradeProJB: Nova subscrição activa:",
+        activeTickSymbol,
+        "Subscription ID:",
+        activeTickSubscriptionId
+      );
+    }
+  }
+
+
   // 1. Confirmar resposta ao Ping
   if (message.msg_type === "ping" && message.ping === "pong") {
     console.log(
@@ -804,7 +892,11 @@ if (message.error) {
       message.error.message
     );
 
-    if (failedRequest.action === "subscribe") {
+    if (
+  failedRequest.action === "subscribe" ||
+  failedRequest.action === "contracts_for" ||
+  failedRequest.action === "forget"
+    ) {
       pendingSymbolChange = null;
       symbolChangeInProgress = false;
     }
@@ -1047,6 +1139,7 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
 // TRADEPROJB — GESTÃO DINÂMICA DA SUBSCRIÇÃO DE TICKS
 // ============================================================
 
+
 async function changeSymbolSubscription(newSymbol) {
   if (!newSymbol || newSymbol === activeTickSymbol) {
     return;
@@ -1059,7 +1152,8 @@ async function changeSymbolSubscription(newSymbol) {
     app.connectedAccountType !== "demo"
   ) {
     console.log(
-      "TradeProJB: Índice guardado. Será subscrito na próxima ligação."
+      "TradeProJB: Índice guardado para a próxima ligação:",
+      newSymbol
     );
     return;
   }
@@ -1069,20 +1163,32 @@ async function changeSymbolSubscription(newSymbol) {
     return;
   }
 
+  if (symbolChangeInProgress) {
+    console.warn(
+      "TradeProJB: Já existe uma mudança de índice em curso."
+    );
+    return;
+  }
+
   const socket = ws;
   const previousSubscriptionId = activeTickSubscriptionId;
   const previousSymbol = activeTickSymbol;
 
+  symbolChangeInProgress = true;
+  pendingSymbolChange = newSymbol;
+
   try {
-    // Cancelar a subscrição anterior, se existir.
+    // 1. Cancelar a subscrição anterior.
     if (previousSubscriptionId) {
-      socket.send(JSON.stringify({
-        forget: previousSubscriptionId,
-        req_id: 2001
-      }));
+      sendSubscriptionRequest(
+        socket,
+        { forget: previousSubscriptionId },
+        "forget",
+        previousSymbol
+      );
     }
 
-    // Preparar a nova análise.
+    // 2. Limpar os dados do índice anterior.
     ticks = [];
     antiManip.digitHistory = [];
     antiManip.cooldownTrades = 0;
@@ -1103,38 +1209,47 @@ async function changeSymbolSubscription(newSymbol) {
       priceElement.textContent = "—";
     }
 
-    // Consultar contratos do novo índice.
-    socket.send(JSON.stringify({
-      contracts_for: newSymbol,
-      req_id: 2002
-    }));
-
-    // Subscrever os ticks do novo índice.
-    socket.send(JSON.stringify({
-      ticks: newSymbol,
-      subscribe: 1,
-      req_id: 2003
-    }));
-
-    pendingSymbolChange = newSymbol;
-
-    console.log(
-      "TradeProJB: Mudança de índice solicitada:",
-      previousSymbol,
-      "→",
+    // 3. Consultar contratos do novo índice.
+    const contractsRequestId = sendSubscriptionRequest(
+      socket,
+      { contracts_for: newSymbol },
+      "contracts_for",
       newSymbol
     );
 
+    // 4. Subscrever os ticks do novo índice.
+    const ticksRequestId = sendSubscriptionRequest(
+      socket,
+      {
+        ticks: newSymbol,
+        subscribe: 1
+      },
+      "subscribe",
+      newSymbol
+    );
+
+    console.log("TradeProJB: Mudança de índice enviada:", {
+      anterior: previousSymbol,
+      novo: newSymbol,
+      contractsRequestId: contractsRequestId,
+      ticksRequestId: ticksRequestId
+    });
+
   } catch (error) {
+    symbolChangeInProgress = false;
+    pendingSymbolChange = null;
+
     console.error(
       "TradeProJB: Erro ao mudar subscrição:",
       error
     );
 
-    alert("Não foi possível solicitar a mudança de índice.");
+    alert(
+      "Não foi possível solicitar a mudança de índice: " +
+      error.message
+    );
   }
 }
-
 
 // ============================================================
 // TRADEPROJB — SELECÇÃO DINÂMICA DE AMOSTRAS

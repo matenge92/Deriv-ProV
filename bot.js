@@ -901,20 +901,20 @@ socket.onmessage = function (event) {
 
     clearTimeout(optionsPending.timer);
 
-    if (message.error) {
-  const apiError = new Error(
-    message.error.message || "Erro da Options API."
-  );
+        if (message.error) {
+      const apiError = new Error(
+        message.error.message || "Erro da Options API."
+      );
 
-  apiError.code = "DERIV_REJECTED";
-  apiError.deriv_error = message.error;
+      apiError.code = "DERIV_REJECTED";
+      apiError.deriv_error = message.error;
 
-  optionsPending.reject(apiError);
+      optionsPending.reject(apiError);
 
-} else {
-  optionsPending.resolve(message);
-}
-
+    } else {
+      optionsPending.resolve(message);
+    }
+    
     console.log(
       "TradeProJB: Resposta Options API recebida:",
       message.req_id,
@@ -1398,22 +1398,36 @@ function sendOptionsRequest(payload, timeout = 15000) {
       clearTimeout(timer);
       delete pendingOptionsRequests[requestId];
 
-      if (pendingRequest && pendingRequest.isBuy && pendingRequest.sent) {
-        const unknownError = new Error(
-          "UNKNOWN: não foi possível confirmar o envio ou resultado da compra."
-        );
+      if (pendingRequest && pendingRequest.isBuy) {
 
-        unknownError.code = "BUY_UNKNOWN";
-        unknownError.cause = error;
+  if (pendingRequest.sent) {
+    const unknownError = new Error(
+      "UNKNOWN: não foi possível confirmar o envio ou resultado da compra."
+    );
 
-        reject(unknownError);
-        return;
-      }
+    unknownError.code = "BUY_UNKNOWN";
+    unknownError.cause = error;
 
-      reject(error);
-    }
+    reject(unknownError);
+    return;
+  }
+
+  const notSentError = new Error(
+    "A compra não chegou a ser enviada."
+  );
+
+  notSentError.code = "REQUEST_NOT_SENT";
+  notSentError.cause = error;
+
+  reject(notSentError);
+  return;
+}
+
+reject(error);
+        }
+  });
+}
     
-
     async function requestContractProposal() {
 
   // =========================================================
@@ -1799,17 +1813,25 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
 
   const accountId = String(app.connectedAccountId || "");
   const socket = ws;
+  const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
 
   if (
-    !socket ||
-    socket.readyState !== WebSocket.OPEN ||
-    !app.wsReady ||
-    app.connectedAccountType !== "demo"
-  ) {
-    throw new Error(
-      "Não existe uma ligação Options API Demo válida."
-    );
+  !socket ||
+  socket.readyState !== WebSocket.OPEN ||
+  !app.wsReady ||
+  app.connectedAccountType !== "demo"
+) {
+  const connectionError = new Error(
+    "Options API não está ligada à conta Demo."
+  );
+
+  if (isBuy) {
+    connectionError.code = "REQUEST_NOT_SENT";
   }
+
+  reject(connectionError);
+  return;
+}
 
   if (
     !accountId ||

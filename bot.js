@@ -1662,6 +1662,17 @@ async function requestContractProposal() {
 
 async function buyContractOptions(proposal, authorizedMaxPrice) {
 
+    // B4 — Bloquear novas compras com tentativa não resolvida
+  if (
+    app.lastPurchaseAttempt &&
+    ["PENDING", "UNKNOWN"].includes(app.lastPurchaseAttempt.status)
+  ) {
+    throw new Error(
+      "Existe uma tentativa de compra pendente ou desconhecida. " +
+      "Reconcilie o estado da compra antes de tentar novamente."
+    );
+  }
+
   // 1. VALIDAR A PROPOSTA
 
   if (!proposal || typeof proposal !== "object") {
@@ -1817,16 +1828,26 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
   }
 
   // 6. VALIDAR A RESPOSTA DA DERIV
+  // B4 — Validar resposta da compra
+if (
+  !response ||
+  response.msg_type !== "buy" ||
+  !response.buy
+) {
+  purchaseAttempt.status = "UNKNOWN";
+  purchaseAttempt.updatedAt = Date.now();
+  purchaseAttempt.reason =
+    "Resposta inesperada após envio da compra.";
 
-  if (
-    !response ||
-    response.msg_type !== "buy" ||
-    !response.buy
-  ) {
-    throw new Error(
-      "A Deriv não devolveu uma confirmação de compra válida."
-    );
-  }
+  console.error(
+    "[BUY UNKNOWN] Resposta inesperada. Não repetir a compra.",
+    response
+  );
+
+  throw new Error(
+    "Estado da compra desconhecido. Consulte a conta antes de tentar novamente."
+  );
+}
 
   const buy = response.buy;
 

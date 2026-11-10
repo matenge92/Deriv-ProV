@@ -1592,6 +1592,192 @@ async function requestContractProposal() {
   return proposal;
 }
 
+
+// ============================================================
+// TRADEPROJB — COMPRA OPTIONS API
+// FASE B — IMPLEMENTAÇÃO PREPARADA
+// NÃO EXECUTAR NESTA FASE
+// ============================================================
+
+async function buyContractOptions(proposal, authorizedMaxPrice) {
+
+  // 1. VALIDAR A PROPOSTA
+
+  if (!proposal || typeof proposal !== "object") {
+    throw new Error("Proposta não fornecida.");
+  }
+
+  if (
+    typeof proposal.id !== "string" ||
+    proposal.id.trim().length === 0
+  ) {
+    throw new Error("ID da proposta inválido.");
+  }
+
+  const askPrice = Number(proposal.ask_price);
+  const maxPrice = Number(authorizedMaxPrice);
+
+  if (!Number.isFinite(askPrice) || askPrice <= 0) {
+    throw new Error("Preço da proposta inválido.");
+  }
+
+  if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+    throw new Error("Preço máximo autorizado inválido.");
+  }
+
+  if (maxPrice < askPrice) {
+    throw new Error(
+      "O preço máximo autorizado é inferior ao preço da proposta."
+    );
+  }
+
+  // 2. VALIDAR A CONTA DEMO
+
+  const accountId = String(app.connectedAccountId || "");
+  const socket = ws;
+
+  if (
+    !socket ||
+    socket.readyState !== WebSocket.OPEN ||
+    !app.wsReady ||
+    app.connectedAccountType !== "demo"
+  ) {
+    throw new Error(
+      "Não existe uma ligação Options API Demo válida."
+    );
+  }
+
+  if (
+    !accountId ||
+    String(selectedAccountId) !== accountId
+  ) {
+    throw new Error(
+      "A conta seleccionada não corresponde à conta ligada."
+    );
+  }
+
+  const account = derivAccounts.find(function (item) {
+    return String(item.account_id) === accountId;
+  });
+
+  if (
+    !account ||
+    String(account.status).toLowerCase() !== "active" ||
+    String(account.account_type).toLowerCase() !== "demo"
+  ) {
+    throw new Error("A conta Demo não passou na validação.");
+  }
+
+  // 3. CONFIRMAR QUE A PROPOSTA AINDA PODE SER UTILIZADA
+
+  if (
+    !app.wsReady ||
+    ws !== socket ||
+    socket.readyState !== WebSocket.OPEN ||
+    String(app.connectedAccountId) !== accountId ||
+    String(selectedAccountId) !== accountId
+  ) {
+    throw new Error(
+      "A sessão mudou antes do envio da compra."
+    );
+  }
+
+  // 4. ENVIAR A COMPRA OPTIONS API
+
+  console.log(
+    "TradeProJB: A enviar compra Options API:",
+    {
+      proposal_id: proposal.id,
+      ask_price: askPrice,
+      authorized_max_price: maxPrice,
+      account_id: accountId
+    }
+  );
+
+  const response = await sendOptionsRequest({
+    buy: proposal.id,
+    price: maxPrice
+  });
+
+  
+  // 5. REGISTAR SE A SESSÃO CONTINUA VÁLIDA
+
+  const sessionStillValid =
+    app.wsReady &&
+    ws === socket &&
+    socket.readyState === WebSocket.OPEN &&
+    String(app.connectedAccountId) === accountId &&
+    String(selectedAccountId) === accountId;
+
+  if (!sessionStillValid) {
+    console.error(
+      "TradeProJB: A sessão mudou durante a compra. " +
+      "A confirmação recebida deverá ser preservada."
+    );
+  }
+
+  // 6. VALIDAR A RESPOSTA DA DERIV
+
+  if (
+    !response ||
+    response.msg_type !== "buy" ||
+    !response.buy
+  ) {
+    throw new Error(
+      "A Deriv não devolveu uma confirmação de compra válida."
+    );
+  }
+
+  const buy = response.buy;
+
+  const contractId = Number(buy.contract_id);
+  const actualBuyPrice = Number(buy.buy_price);
+
+  if (
+    !Number.isSafeInteger(contractId) ||
+    contractId <= 0
+  ) {
+    throw new Error(
+      "A compra não devolveu um contract_id válido."
+    );
+  }
+
+  if (
+    !Number.isFinite(actualBuyPrice) ||
+    actualBuyPrice <= 0
+  ) {
+    throw new Error(
+      "O preço efectivo da compra é inválido."
+    );
+  }
+
+  if (actualBuyPrice > maxPrice + 0.00000001) {
+    throw new Error(
+      "O preço efectivo ultrapassou o limite autorizado."
+    );
+  }
+
+  // 7. REGISTAR A COMPRA CONFIRMADA
+
+    const result = {
+    contract_id: contractId,
+    buy_price: actualBuyPrice,
+    proposal_id: proposal.id,
+    account_id: accountId,
+    transaction_id: buy.transaction_id || null,
+    purchase_time: buy.purchase_time || null,
+    longcode: buy.longcode || proposal.longcode || null,
+    sessionValidAtConfirmation: sessionStillValid
+    };
+  console.log(
+    "TradeProJB: Compra Options API validada:",
+    result
+  );
+
+  return result;
+}
+
+
 // ============================================================
 // TRADEPROJB — ACOMPANHAMENTO OPTIONS API
 // ============================================================

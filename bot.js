@@ -1327,63 +1327,56 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
 function sendOptionsRequest(payload, timeout = 15000) {
   return new Promise(function (resolve, reject) {
 
+    
+    const accountId = String(app.connectedAccountId || "");
     const socket = ws;
-    const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
-
     if (
-  !socket ||
-  socket.readyState !== WebSocket.OPEN ||
-  !app.wsReady ||
-  app.connectedAccountType !== "demo"
-) {
-  const connectionError = new Error(
-    "Options API não está ligada à conta Demo."
-  );
-
-  if (isBuy) {
-    connectionError.code = "REQUEST_NOT_SENT";
-  }
-
-  reject(connectionError);
-  return;
-}
-
+      !socket ||
+      socket.readyState !== WebSocket.OPEN ||
+      !app.wsReady ||
+      app.connectedAccountType !== "demo"
+    ) {
+      throw new Error(
+        "Options API não está ligada à conta Demo. Compra não enviada."
+      );
+    }
+    
     const requestId = ++optionsRequestId;
 
         const timer = setTimeout(function () {
-      const pending = pendingOptionsRequests[requestId];
+          const pending = pendingOptionsRequests[requestId];
 
-      if (pending) {
-        delete pendingOptionsRequests[requestId];
+          if (pending) {
+            delete pendingOptionsRequests[requestId];
 
-        const timeoutError = new Error(
-          pending.isBuy && pending.sent
-            ? "UNKNOWN: a compra foi enviada, mas não chegou confirmação."
-            : "Tempo esgotado no pedido Options API: " + requestId
-        );
+            const timeoutError = new Error(
+              pending.isBuy && pending.sent
+              ? "UNKNOWN: a compra foi enviada, mas não chegou confirmação."
+              : "Tempo esgotado no pedido Options API: " + requestId
+            );
 
-        if (pending.isBuy && pending.sent) {
-          timeoutError.code = "BUY_UNKNOWN";
-        }
+            if (pending.isBuy && pending.sent) {
+              timeoutError.code = "BUY_UNKNOWN";
+            }
 
-        reject(timeoutError);
-      }
-    }, timeout);
-
-        pendingOptionsRequests[requestId] = {
-      resolve: resolve,
-      reject: reject,
-      timer: timer,
-      createdAt: Date.now(),
-      payload: payload,
-      socket: socket,
-      isBuy: Object.prototype.hasOwnProperty.call(payload, "buy"),
-      sent: false
-    };
+            reject(timeoutError);
+          }
+        }, timeout);
     
-        try {
-      const message = JSON.stringify({
-        ...payload,
+        pendingOptionsRequests[requestId] = {
+          resolve: resolve,
+          reject: reject,
+          timer: timer,
+          createdAt: Date.now(),
+          payload: payload,
+          socket: socket,
+          isBuy: Object.prototype.hasOwnProperty.call(payload, "buy"),
+          sent: false
+        };
+    
+    try {
+          const message = JSON.stringify({
+            ...payload,
         req_id: requestId
       });
 
@@ -1624,6 +1617,7 @@ if (digitContracts.includes(contractType)) {
 
 const sessionAndParametersValid =
   app.wsReady &&
+  app.connectedAccountType === "demo" &&
   ws === socketAtRequest &&
   socketAtRequest.readyState === WebSocket.OPEN &&
   String(app.connectedAccountId) === connectedAccountId &&

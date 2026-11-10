@@ -31,6 +31,38 @@ let subscriptionReqId = 3000;
 let pendingSubscriptionRequests = {};
 let symbolChangeInProgress = false;
 
+// Limpar apenas os pedidos pertencentes ao socket que fechou
+function cleanupPendingRequestsForSocket(socket) {
+  let optionsCleaned = 0;
+  let subscriptionsCleaned = 0;
+
+  // Limpar pedidos da Options API e rejeitar as respectivas Promises
+  Object.entries(pendingOptionsRequests).forEach(function ([id, request]) {
+    if (request.socket === socket) {
+      clearTimeout(request.timer);
+      delete pendingOptionsRequests[id];
+
+      request.reject(
+        new Error("Ligação WebSocket fechada antes da resposta.")
+      );
+
+      optionsCleaned++;
+    }
+  });
+
+  // Limpar pedidos de subscrição pertencentes ao mesmo socket
+  Object.entries(pendingSubscriptionRequests).forEach(function ([id, request]) {
+    if (request.socket === socket) {
+      delete pendingSubscriptionRequests[id];
+      subscriptionsCleaned++;
+    }
+  });
+
+  console.log("TradeProJB: Limpeza após fecho do WebSocket:", {
+    pedidosOptionsAPI: optionsCleaned,
+    pedidosSubscricao: subscriptionsCleaned
+  });
+}
 const app = {
   status: "idle", // idle | connecting | connected | running
   token: null,
@@ -1195,6 +1227,10 @@ if (samplesElement) {
       };
 
       socket.onclose = function (event) {
+
+  // Limpar pedidos pertencentes a esta ligação,
+  // mesmo que já exista outro socket activo.
+        cleanupPendingRequestsForSocket(socket);
   
         if (ws === socket) {
           if (optionsPingTimer) {
@@ -1253,11 +1289,12 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
   const requestId = ++subscriptionReqId;
 
   pendingSubscriptionRequests[requestId] = {
-    action: action,
-    symbol: symbol,
-    createdAt: Date.now()
-  };
-
+  action: action,
+  symbol: symbol,
+  createdAt: Date.now(),
+  socket: socket
+};
+  
   socket.send(JSON.stringify({
     ...payload,
     req_id: requestId
@@ -1298,13 +1335,14 @@ function sendOptionsRequest(payload, timeout = 15000) {
     }, timeout);
 
     pendingOptionsRequests[requestId] = {
-      resolve: resolve,
-      reject: reject,
-      timer: timer,
-      createdAt: Date.now(),
-      payload: payload
-    };
-
+  resolve: resolve,
+  reject: reject,
+  timer: timer,
+  createdAt: Date.now(),
+  payload: payload,
+  socket: socket
+};
+    
     try {
       socket.send(JSON.stringify({
         ...payload,

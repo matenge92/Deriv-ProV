@@ -42,9 +42,17 @@ function cleanupPendingRequestsForSocket(socket) {
       clearTimeout(request.timer);
       delete pendingOptionsRequests[id];
 
-      request.reject(
-        new Error("Ligação WebSocket fechada antes da resposta.")
+            const closeError = new Error(
+        request.isBuy && request.sent
+          ? "UNKNOWN: ligação fechada durante a confirmação da compra."
+          : "Ligação WebSocket fechada antes da resposta."
       );
+
+      if (request.isBuy && request.sent) {
+        closeError.code = "BUY_UNKNOWN";
+      }
+
+      request.reject(closeError);
 
       optionsCleaned++;
     }
@@ -68,7 +76,8 @@ const app = {
   token: null,
   wsReady: false,
   connectedAccountType: null,
-  connectedAccountId: null
+  connectedAccountId: null,
+  lastPurchaseAttempt: null
 };
 // CONTAS DERIV
 let derivAccounts = [];
@@ -1324,31 +1333,45 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
     const requestId = ++optionsRequestId;
 
-    const timer = setTimeout(function () {
-      if (pendingOptionsRequests[requestId]) {
+        const timer = setTimeout(function () {
+      const pending = pendingOptionsRequests[requestId];
+
+      if (pending) {
         delete pendingOptionsRequests[requestId];
 
-        reject(
-          new Error("Tempo esgotado no pedido Options API: " + requestId)
+        const timeoutError = new Error(
+          pending.isBuy && pending.sent
+            ? "UNKNOWN: a compra foi enviada, mas não chegou confirmação."
+            : "Tempo esgotado no pedido Options API: " + requestId
         );
+
+        if (pending.isBuy && pending.sent) {
+          timeoutError.code = "BUY_UNKNOWN";
+        }
+
+        reject(timeoutError);
       }
     }, timeout);
 
-    pendingOptionsRequests[requestId] = {
-  resolve: resolve,
-  reject: reject,
-  timer: timer,
-  createdAt: Date.now(),
-  payload: payload,
-  socket: socket
-};
+        pendingOptionsRequests[requestId] = {
+      resolve: resolve,
+      reject: reject,
+      timer: timer,
+      createdAt: Date.now(),
+      payload: payload,
+      socket: socket,
+      isBuy: Object.prototype.hasOwnProperty.call(payload, "buy"),
+      sent: false
+    };
     
     try {
-      socket.send(JSON.stringify({
+            socket.send(JSON.stringify({
         ...payload,
         req_id: requestId
       }));
 
+      pendingOptionsRequests[requestId].sent = true;
+      
       console.log(
         "TradeProJB: Pedido Options API enviado:",
         requestId,
@@ -1732,10 +1755,49 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
     }
   );
 
-  const response = await sendOptionsRequest({
-    buy: proposal.id,
-    price: maxPrice
-  });
+    const purchaseAttempt = {
+    status: "PENDING",
+    proposal_id: proposal.id,
+    account_id: accountId,
+    socket: socket,
+    requested_price: maxPrice,
+    startedAt: Date.now(),
+    contract_id: null,
+    transaction_id: null
+  };
+
+  app.lastPurchaseAttempt = purchaseAttempt;
+
+  let response;
+
+  try {
+    response = await sendOptionsRequest({
+      buy: proposal.id,
+      price: maxPrice
+    });
+
+  } catch (error) {
+
+    if (error.code === "BUY_UNKNOWN") {
+      purchaseAttempt.status = "UNKNOWN";
+      purchaseAttempt.updatedAt = Date.now();
+      purchaseAttempt.reason = error.message;
+
+      console.error(
+        "TradeProJB: RESULTADO DA COMPRA DESCONHECIDO. " +
+        "Não repetir a compra. É necessária reconciliação.",
+        purchaseAttempt
+      );
+
+      throw error;
+    }
+
+    purchaseAttempt.status = "REJECTED";
+    purchaseAttempt.updatedAt = Date.now();
+    purchaseAttempt.reason = error.message;
+
+    throw error;
+  }
 
   
   // 5. REGISTAR SE A SESSÃO CONTINUA VÁLIDA
@@ -1796,7 +1858,11 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
   }
 
   // 7. REGISTAR A COMPRA CONFIRMADA
-
+    purchaseAttempt.status = "CONFIRMED";
+    purchaseAttempt.updatedAt = Date.now();
+    purchaseAttempt.contract_id = contractId;
+    purchaseAttempt.transaction_id = buy.transaction_id || null;
+  
     const result = {
     contract_id: contractId,
     buy_price: actualBuyPrice,

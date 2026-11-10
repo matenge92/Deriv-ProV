@@ -15,6 +15,8 @@ let optionsRequestId = 500000;
 let pendingOptionsRequests = {};
 // Acompanhamento de contratos pela Options API
 let activeContractMonitors = {};
+// C1 — Contexto privado das propostas Options API
+const proposalContexts = new WeakMap();
 
 let ticks = [],
   selectedDigit = 0;
@@ -900,12 +902,18 @@ socket.onmessage = function (event) {
     clearTimeout(optionsPending.timer);
 
     if (message.error) {
-      optionsPending.reject(
-        new Error(message.error.message || "Erro da Options API.")
-      );
-    } else {
-      optionsPending.resolve(message);
-    }
+  const apiError = new Error(
+    message.error.message || "Erro da Options API."
+  );
+
+  apiError.code = "DERIV_REJECTED";
+  apiError.deriv_error = message.error;
+
+  optionsPending.reject(apiError);
+
+} else {
+  optionsPending.resolve(message);
+}
 
     console.log(
       "TradeProJB: Resposta Options API recebida:",
@@ -1364,14 +1372,20 @@ function sendOptionsRequest(payload, timeout = 15000) {
       sent: false
     };
     
-    try {
-            socket.send(JSON.stringify({
+        try {
+      const message = JSON.stringify({
         ...payload,
         req_id: requestId
-      }));
+      });
 
-      pendingOptionsRequests[requestId].sent = true;
-      
+      const pendingRequest = pendingOptionsRequests[requestId];
+
+      // Considerar a compra enviada antes de chamar socket.send.
+      // Se houver uma excepção, o resultado será tratado como UNKNOWN.
+      pendingRequest.sent = true;
+
+      socket.send(message);
+
       console.log(
         "TradeProJB: Pedido Options API enviado:",
         requestId,
@@ -1379,16 +1393,28 @@ function sendOptionsRequest(payload, timeout = 15000) {
       );
 
     } catch (error) {
+      const pendingRequest = pendingOptionsRequests[requestId];
+
       clearTimeout(timer);
       delete pendingOptionsRequests[requestId];
+
+      if (pendingRequest && pendingRequest.isBuy && pendingRequest.sent) {
+        const unknownError = new Error(
+          "UNKNOWN: não foi possível confirmar o envio ou resultado da compra."
+        );
+
+        unknownError.code = "BUY_UNKNOWN";
+        unknownError.cause = error;
+
+        reject(unknownError);
+        return;
+      }
+
       reject(error);
     }
-  });
-}
+    
 
-
-
-async function requestContractProposal() {
+    async function requestContractProposal() {
 
   // =========================================================
   // 1. VALIDAR A LIGAÇÃO E A CONTA
@@ -1418,9 +1444,14 @@ async function requestContractProposal() {
 
   const connectedAccountId = String(app.connectedAccountId);
 
+// C2 — Fixar a sessão que irá criar a proposta
+ 
+  const socketAtRequest = ws;
+  const isRecoveryAtRequest = Boolean(bot.isRecovery);
+
   const account = derivAccounts.find(function (item) {
-    return String(item.account_id) === connectedAccountId;
-  });
+   return String(item.account_id) === connectedAccountId;
+ });
 
   if (
     !account ||
@@ -1432,6 +1463,9 @@ async function requestContractProposal() {
       "A conta Demo ligada não foi validada correctamente."
     );
   }
+  
+   // C2 — Fixar a moeda da conta validada
+  const currency = String(account.currency);
 
   // =========================================================
   // 2. VALIDAR OS PARÂMETROS DA PROPOSTA
@@ -1489,18 +1523,21 @@ async function requestContractProposal() {
     amount: stake,
     basis: "stake",
     contract_type: contractType,
-    currency: account.currency,
+    currency: currency,
     duration: duration,
     duration_unit: durationUnit,
     underlying_symbol: symbol
   };
 
+  let proposalBarrier = null;
+
   if (digitContracts.includes(contractType)) {
 
     const prediction = Number(
-      bot.isRecovery
-        ? recoveryPred(contractType)
-        : bot.prediction
+  isRecoveryAtRequest
+    ? recoveryPred(contractType)
+    : bot.prediction
+      
     );
 
     if (
@@ -1513,7 +1550,8 @@ async function requestContractProposal() {
       );
     }
 
-    payload.barrier = String(prediction);
+    proposalBarrier = String(prediction);
+    payload.barrier = proposalBarrier;
   }
 
   // =========================================================
@@ -1539,17 +1577,52 @@ async function requestContractProposal() {
   // 4. CONFIRMAR QUE A SESSÃO NÃO MUDOU
   // =========================================================
 
+const currentAccount = derivAccounts.find(function (item) {
+  return String(item.account_id) === connectedAccountId;
+});
+
+let currentBarrier = null;
+
+if (digitContracts.includes(contractType)) {
+  const currentPrediction = Number(
+    bot.isRecovery
+      ? recoveryPred(contractType)
+      : bot.prediction
+  );
+
   if (
-    !app.wsReady ||
-    !ws ||
-    ws.readyState !== WebSocket.OPEN ||
-    String(app.connectedAccountId) !== connectedAccountId ||
-    String(selectedAccountId) !== connectedAccountId
+    Number.isInteger(currentPrediction) &&
+    currentPrediction >= 0 &&
+    currentPrediction <= 9
   ) {
-    throw new Error(
-      "A ligação ou a conta mudou durante o pedido da proposta."
-    );
+    currentBarrier = String(currentPrediction);
   }
+}
+
+const sessionAndParametersValid =
+  app.wsReady &&
+  ws === socketAtRequest &&
+  socketAtRequest.readyState === WebSocket.OPEN &&
+  String(app.connectedAccountId) === connectedAccountId &&
+  String(selectedAccountId) === connectedAccountId &&
+  currentAccount &&
+  String(currentAccount.status).toLowerCase() === "active" &&
+  String(currentAccount.account_type).toLowerCase() === "demo" &&
+  String(currentAccount.currency) === currency &&
+  String(bot.symbol || "") === symbol &&
+  String(bot.contractType || "").toUpperCase() === contractType &&
+  Number(bot.currentStake) === stake &&
+  Number(bot.duration) === duration &&
+  String(bot.durationType) === durationUnit &&
+  Boolean(bot.isRecovery) === isRecoveryAtRequest &&
+  currentBarrier === proposalBarrier;
+
+if (!sessionAndParametersValid) {
+  throw new Error(
+    "A ligação, a conta ou os parâmetros mudaram durante o pedido da proposta."
+  );
+}
+
 
   // =========================================================
   // 5. VALIDAR A RESPOSTA DA DERIV
@@ -1637,6 +1710,25 @@ async function requestContractProposal() {
   // 6. REGISTAR O RESULTADO — SEM COMPRAR
   // =========================================================
 
+  // C5 — Vincular a proposta à sessão e aos parâmetros originais
+const proposalCreatedAt = Date.now();
+
+proposalContexts.set(proposal, {
+  proposal_id: proposal.id,
+  account_id: connectedAccountId,
+  socket: socketAtRequest,
+  symbol: symbol,
+  contract_type: contractType,
+  stake: stake,
+  duration: duration,
+  duration_unit: durationUnit,
+  currency: currency,
+  barrier: proposalBarrier,
+  is_recovery: isRecoveryAtRequest,
+  ask_price: askPrice,
+  created_at: proposalCreatedAt,
+  expires_at: proposalCreatedAt + 30000
+});
   console.log(
     "TradeProJB: Proposta validada com sucesso:",
     {
@@ -1754,6 +1846,64 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
     );
   }
 
+    // C-B4 — Validar o contexto original da proposta
+
+  const proposalContext = proposalContexts.get(proposal);
+
+  if (!proposalContext) {
+    throw new Error(
+      "Proposta sem contexto original validado. Compra bloqueada."
+    );
+  }
+
+  const digitContracts = [
+    "DIGITDIFF",
+    "DIGITOVER",
+    "DIGITUNDER",
+    "DIGITMATCH"
+  ];
+
+  let currentBarrier = null;
+
+  if (digitContracts.includes(proposalContext.contract_type)) {
+    const currentPrediction = Number(
+      bot.isRecovery
+        ? recoveryPred(proposalContext.contract_type)
+        : bot.prediction
+    );
+
+    if (
+      Number.isInteger(currentPrediction) &&
+      currentPrediction >= 0 &&
+      currentPrediction <= 9
+    ) {
+      currentBarrier = String(currentPrediction);
+    }
+  }
+
+  const contextIsValid =
+    proposalContext.proposal_id === proposal.id &&
+    Date.now() <= proposalContext.expires_at &&
+    proposalContext.socket === socket &&
+    proposalContext.account_id === accountId &&
+    proposalContext.symbol === String(bot.symbol || "") &&
+    proposalContext.contract_type ===
+      String(bot.contractType || "").toUpperCase() &&
+    proposalContext.stake === Number(bot.currentStake) &&
+    proposalContext.duration === Number(bot.duration) &&
+    proposalContext.duration_unit === String(bot.durationType) &&
+    proposalContext.currency === String(account.currency) &&
+    proposalContext.is_recovery === Boolean(bot.isRecovery) &&
+    proposalContext.barrier === currentBarrier &&
+    proposalContext.ask_price === askPrice;
+
+  if (!contextIsValid) {
+    throw new Error(
+      "A proposta expirou ou os parâmetros originais foram alterados. " +
+      "Solicite uma nova proposta."
+    );
+  }
+
   // 4. ENVIAR A COMPRA OPTIONS API
 
   console.log(
@@ -1789,27 +1939,52 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
 
   } catch (error) {
 
+    purchaseAttempt.updatedAt = Date.now();
+    purchaseAttempt.reason = error.message;
+
     if (error.code === "BUY_UNKNOWN") {
       purchaseAttempt.status = "UNKNOWN";
-      purchaseAttempt.updatedAt = Date.now();
-      purchaseAttempt.reason = error.message;
 
       console.error(
-        "TradeProJB: RESULTADO DA COMPRA DESCONHECIDO. " +
-        "Não repetir a compra. É necessária reconciliação.",
+        "[BUY UNKNOWN] Não repetir. É necessária reconciliação.",
         purchaseAttempt
       );
-      
+
       throw error;
     }
 
-    purchaseAttempt.status = "REJECTED";
-    purchaseAttempt.updatedAt = Date.now();
-    purchaseAttempt.reason = error.message;
-    
+    if (error.code === "DERIV_REJECTED") {
+      purchaseAttempt.status = "REJECTED";
+
+      console.error(
+        "[BUY REJECTED] A Deriv rejeitou explicitamente a compra.",
+        error.deriv_error || error.message
+      );
+
+      throw error;
+    }
+
+    if (error.code === "REQUEST_NOT_SENT") {
+      purchaseAttempt.status = "NOT_SENT";
+
+      console.warn(
+        "[BUY NOT SENT] O pedido não chegou a ser enviado.",
+        error.message
+      );
+
+      throw error;
+    }
+
+    // Qualquer outro erro é tratado conservadoramente.
+    purchaseAttempt.status = "UNKNOWN";
+
+    console.error(
+      "[BUY UNKNOWN] Erro sem classificação segura. Não repetir.",
+      error
+    );
+
     throw error;
   }
-
   
   // 5. REGISTAR SE A SESSÃO CONTINUA VÁLIDA
 

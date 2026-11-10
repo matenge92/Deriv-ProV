@@ -1816,24 +1816,16 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
 
   const accountId = String(app.connectedAccountId || "");
   const socket = ws;
-  const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
-
-  if (
+  
+if (
   !socket ||
   socket.readyState !== WebSocket.OPEN ||
   !app.wsReady ||
   app.connectedAccountType !== "demo"
 ) {
-  const connectionError = new Error(
-    "Options API não está ligada à conta Demo."
+  throw new Error(
+    "Options API não está ligada a uma conta Demo. Compra não enviada."
   );
-
-  if (isBuy) {
-    connectionError.code = "REQUEST_NOT_SENT";
-  }
-
-  reject(connectionError);
-  return;
 }
 
   if (
@@ -1861,6 +1853,7 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
 
   if (
     !app.wsReady ||
+    app.connectedAccountType !== "demo" ||
     ws !== socket ||
     socket.readyState !== WebSocket.OPEN ||
     String(app.connectedAccountId) !== accountId ||
@@ -2015,6 +2008,7 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
 
   const sessionStillValid =
     app.wsReady &&
+    app.connectedAccountType === "demo" &&
     ws === socket &&
     socket.readyState === WebSocket.OPEN &&
     String(app.connectedAccountId) === accountId &&

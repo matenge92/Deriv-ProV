@@ -1799,14 +1799,14 @@ async function buyContractOptions(proposal, authorizedMaxPrice) {
         "Não repetir a compra. É necessária reconciliação.",
         purchaseAttempt
       );
-
+      
       throw error;
     }
 
     purchaseAttempt.status = "REJECTED";
     purchaseAttempt.updatedAt = Date.now();
     purchaseAttempt.reason = error.message;
-
+    
     throw error;
   }
 
@@ -1849,51 +1849,88 @@ if (
   );
 }
 
-  const buy = response.buy;
+const buy = response.buy;
 
-  const contractId = Number(buy.contract_id);
-  const actualBuyPrice = Number(buy.buy_price);
+// 1. Validar o ID do contrato
+const contractId = Number(buy.contract_id);
 
-  if (
-    !Number.isSafeInteger(contractId) ||
-    contractId <= 0
-  ) {
-    throw new Error(
-      "A compra não devolveu um contract_id válido."
-    );
-  }
+if (
+  !Number.isSafeInteger(contractId) ||
+  contractId <= 0
+) {
+  purchaseAttempt.status = "UNKNOWN";
+  purchaseAttempt.updatedAt = Date.now();
+  purchaseAttempt.reason =
+    "Resposta de compra recebida sem contract_id válido.";
 
-  if (
-    !Number.isFinite(actualBuyPrice) ||
-    actualBuyPrice <= 0
-  ) {
-    throw new Error(
-      "O preço efectivo da compra é inválido."
-    );
-  }
+  console.error(
+    "[BUY UNKNOWN] Não foi possível identificar o contrato. Não repetir.",
+    response
+  );
 
-  if (actualBuyPrice > maxPrice + 0.00000001) {
-    throw new Error(
-      "O preço efectivo ultrapassou o limite autorizado."
-    );
-  }
+  throw new Error(
+    "Compra com estado desconhecido. É necessária reconciliação da conta."
+  );
+}
 
-  // 7. REGISTAR A COMPRA CONFIRMADA
-    purchaseAttempt.status = "CONFIRMED";
-    purchaseAttempt.updatedAt = Date.now();
-    purchaseAttempt.contract_id = contractId;
-    purchaseAttempt.transaction_id = buy.transaction_id || null;
+// 2. CONFIRMAR IMEDIATAMENTE A COMPRA
+// Um contract_id válido confirma que a compra foi executada.
+purchaseAttempt.status = "CONFIRMED";
+purchaseAttempt.updatedAt = Date.now();
+purchaseAttempt.contract_id = contractId;
+purchaseAttempt.transaction_id =
+  buy.transaction_id || null;
+
+// 3. Verificar o preço sem desfazer a confirmação
+const actualBuyPrice = Number(buy.buy_price);
+
+let priceAnomaly = null;
+
+if (
+  !Number.isFinite(actualBuyPrice) ||
+  actualBuyPrice <= 0
+) {
+  priceAnomaly = "Preço efectivo inválido.";
+} else if (
+  actualBuyPrice > maxPrice + 0.00000001
+) {
+  priceAnomaly =
+    "Preço efectivo acima do limite autorizado.";
+}
+
+if (priceAnomaly) {
+  purchaseAttempt.priceAnomaly = priceAnomaly;
+
+  console.error(
+    "[BUY CONFIRMED — PRICE ANOMALY]",
+    {
+      contract_id: contractId,
+      requested_max_price: maxPrice,
+      actual_buy_price: buy.buy_price,
+      anomaly: priceAnomaly
+    }
+  );
+}
+
+// 4. Guardar os dados da compra
+purchaseAttempt.actual_buy_price =
+  Number.isFinite(actualBuyPrice) && actualBuyPrice > 0
+    ? actualBuyPrice
+    : null;
+
+const result = {
+  contract_id: contractId,
+  buy_price: purchaseAttempt.actual_buy_price,
+  proposal_id: proposal.id,
+  account_id: accountId,
+  transaction_id: buy.transaction_id || null,
+  purchase_time: buy.purchase_time || null,
+  longcode: buy.longcode || proposal.longcode || null,
+  sessionValidAtConfirmation: sessionStillValid,
+  priceAnomaly: priceAnomaly
+};
+
   
-    const result = {
-    contract_id: contractId,
-    buy_price: actualBuyPrice,
-    proposal_id: proposal.id,
-    account_id: accountId,
-    transaction_id: buy.transaction_id || null,
-    purchase_time: buy.purchase_time || null,
-    longcode: buy.longcode || proposal.longcode || null,
-    sessionValidAtConfirmation: sessionStillValid
-    };
   console.log(
     "TradeProJB: Compra Options API validada:",
     result

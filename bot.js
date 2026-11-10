@@ -1328,16 +1328,25 @@ function sendOptionsRequest(payload, timeout = 15000) {
   return new Promise(function (resolve, reject) {
 
     const socket = ws;
+    const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
 
     if (
-      !socket ||
-      socket.readyState !== WebSocket.OPEN ||
-      !app.wsReady ||
-      app.connectedAccountType !== "demo"
-    ) {
-      reject(new Error("Options API não está ligada à conta Demo."));
-      return;
-    }
+  !socket ||
+  socket.readyState !== WebSocket.OPEN ||
+  !app.wsReady ||
+  app.connectedAccountType !== "demo"
+) {
+  const connectionError = new Error(
+    "Options API não está ligada à conta Demo."
+  );
+
+  if (isBuy) {
+    connectionError.code = "REQUEST_NOT_SENT";
+  }
+
+  reject(connectionError);
+  return;
+}
 
     const requestId = ++optionsRequestId;
 
@@ -1382,7 +1391,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
       // Considerar a compra enviada antes de chamar socket.send.
       // Se houver uma excepção, o resultado será tratado como UNKNOWN.
-      pendingRequest.sent = true;
+      pendingRequest.sent = isBuy;
 
       socket.send(message);
 
@@ -1398,32 +1407,32 @@ function sendOptionsRequest(payload, timeout = 15000) {
       clearTimeout(timer);
       delete pendingOptionsRequests[requestId];
 
-      if (pendingRequest && pendingRequest.isBuy) {
+          if (pendingRequest && pendingRequest.isBuy) {
+        
+            if (pendingRequest.sent) {
+              const unknownError = new Error(
+                "UNKNOWN: não foi possível confirmar o envio ou resultado da compra."
+              );
+              
+              unknownError.code = "BUY_UNKNOWN";
+              unknownError.cause = error;
 
-  if (pendingRequest.sent) {
-    const unknownError = new Error(
-      "UNKNOWN: não foi possível confirmar o envio ou resultado da compra."
-    );
+    
+              reject(unknownError);
+              return;
+            }
 
-    unknownError.code = "BUY_UNKNOWN";
-    unknownError.cause = error;
+            const notSentError = new Error(
+              "A compra não chegou a ser enviada."
+            );
 
-    reject(unknownError);
-    return;
-  }
+            notSentError.code = "REQUEST_NOT_SENT";
+            notSentError.cause = error;
 
-  const notSentError = new Error(
-    "A compra não chegou a ser enviada."
-  );
-
-  notSentError.code = "REQUEST_NOT_SENT";
-  notSentError.cause = error;
-
-  reject(notSentError);
-  return;
-}
-
-reject(error);
+            reject(notSentError);
+            return;
+          }
+          reject(error);
         }
   });
 }

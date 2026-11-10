@@ -1326,26 +1326,95 @@ function sendOptionsRequest(payload, timeout = 15000) {
 }
 
 
-// ============================================================
-// TRADEPROJB — SOLICITAR PROPOSTA DE CONTRATO
-// Esta função apenas consulta o preço. NÃO compra.
-// ============================================================
 
 async function requestContractProposal() {
 
-  if (!app.wsReady || app.connectedAccountType !== "demo") {
-    throw new Error("É necessário estar ligado à conta Demo.");
+  // =========================================================
+  // 1. VALIDAR A LIGAÇÃO E A CONTA
+  // =========================================================
+
+  if (
+    !ws ||
+    ws.readyState !== WebSocket.OPEN ||
+    !app.wsReady ||
+    app.connectedAccountType !== "demo"
+  ) {
+    throw new Error(
+      "A Options API não está ligada a uma conta Demo."
+    );
   }
+
+  if (
+    !selectedAccountId ||
+    !app.connectedAccountId ||
+    String(selectedAccountId) !== String(app.connectedAccountId)
+  ) {
+    throw new Error(
+      "A conta seleccionada não corresponde à conta ligada. " +
+      "Ligue novamente a conta correcta."
+    );
+  }
+
+  const connectedAccountId = String(app.connectedAccountId);
 
   const account = derivAccounts.find(function (item) {
-    return String(item.account_id) === String(selectedAccountId);
+    return String(item.account_id) === connectedAccountId;
   });
 
-  if (!account || !account.currency) {
-    throw new Error("Não foi possível identificar a moeda da conta.");
+  if (
+    !account ||
+    String(account.status).toLowerCase() !== "active" ||
+    String(account.account_type).toLowerCase() !== "demo" ||
+    !account.currency
+  ) {
+    throw new Error(
+      "A conta Demo ligada não foi validada correctamente."
+    );
   }
 
-  const contractType = bot.contractType;
+  // =========================================================
+  // 2. VALIDAR OS PARÂMETROS DA PROPOSTA
+  // =========================================================
+
+  const contractType = String(bot.contractType || "").toUpperCase();
+
+  const allowedContracts = [
+    "DIGITDIFF",
+    "DIGITOVER",
+    "DIGITUNDER",
+    "DIGITMATCH",
+    "DIGITEVEN",
+    "DIGITODD",
+    "CALL",
+    "PUT"
+  ];
+
+  if (!allowedContracts.includes(contractType)) {
+    throw new Error(
+      "Tipo de contrato não permitido: " + contractType
+    );
+  }
+
+  const stake = Number(bot.currentStake);
+  const duration = Number(bot.duration);
+  const durationUnit = String(bot.durationType);
+  const symbol = String(bot.symbol || "");
+
+  if (!Number.isFinite(stake) || stake <= 0) {
+    throw new Error("Valor de stake inválido.");
+  }
+
+  if (!Number.isInteger(duration) || duration <= 0) {
+    throw new Error("Duração do contrato inválida.");
+  }
+
+  if (!["t", "s", "m", "h", "d"].includes(durationUnit)) {
+    throw new Error("Unidade de duração inválida.");
+  }
+
+  if (!symbol) {
+    throw new Error("Índice não seleccionado.");
+  }
 
   const digitContracts = [
     "DIGITDIFF",
@@ -1356,52 +1425,172 @@ async function requestContractProposal() {
 
   const payload = {
     proposal: 1,
-    amount: Number(bot.currentStake),
+    amount: stake,
     basis: "stake",
     contract_type: contractType,
     currency: account.currency,
-    duration: Number(bot.duration),
-    duration_unit: bot.durationType,
-    underlying_symbol: bot.symbol
+    duration: duration,
+    duration_unit: durationUnit,
+    underlying_symbol: symbol
   };
 
   if (digitContracts.includes(contractType)) {
-    const prediction = bot.isRecovery
-      ? recoveryPred(contractType)
-      : bot.prediction;
+
+    const prediction = Number(
+      bot.isRecovery
+        ? recoveryPred(contractType)
+        : bot.prediction
+    );
+
+    if (
+      !Number.isInteger(prediction) ||
+      prediction < 0 ||
+      prediction > 9
+    ) {
+      throw new Error(
+        "Barreira ou previsão de dígito inválida."
+      );
+    }
 
     payload.barrier = String(prediction);
   }
 
+  // =========================================================
+  // 3. SOLICITAR A PROPOSTA
+  // =========================================================
+
   console.log(
-    "TradeProJB: A solicitar proposta:",
-    payload
+    "TradeProJB: A solicitar proposta validada:",
+    {
+      account_id: connectedAccountId,
+      symbol: symbol,
+      contract_type: contractType,
+      stake: stake,
+      duration: duration,
+      duration_unit: durationUnit,
+      barrier: payload.barrier
+    }
   );
 
   const response = await sendOptionsRequest(payload);
 
+  // =========================================================
+  // 4. CONFIRMAR QUE A SESSÃO NÃO MUDOU
+  // =========================================================
+
+  if (
+    !app.wsReady ||
+    !ws ||
+    ws.readyState !== WebSocket.OPEN ||
+    String(app.connectedAccountId) !== connectedAccountId ||
+    String(selectedAccountId) !== connectedAccountId
+  ) {
+    throw new Error(
+      "A ligação ou a conta mudou durante o pedido da proposta."
+    );
+  }
+
+  // =========================================================
+  // 5. VALIDAR A RESPOSTA DA DERIV
+  // =========================================================
+
+  if (
+    !response ||
+    response.msg_type !== "proposal" ||
+    !response.proposal
+  ) {
+    throw new Error(
+      "A resposta recebida não é uma proposta válida."
+    );
+  }
+
   const proposal = response.proposal;
 
   if (
-    !proposal ||
-    !proposal.id ||
-    !Number.isFinite(Number(proposal.ask_price))
+    typeof proposal.id !== "string" ||
+    proposal.id.trim().length === 0
   ) {
-    throw new Error("Resposta da proposta incompleta ou inválida.");
+    throw new Error(
+      "A proposta não contém um ID válido."
+    );
   }
 
-  console.log("TradeProJB: Proposta recebida:", {
-    proposal_id: proposal.id,
-    contract_type: contractType,
-    symbol: bot.symbol,
-    ask_price: proposal.ask_price,
-    payout: proposal.payout,
-    longcode: proposal.longcode
-  });
+  const askPrice = Number(proposal.ask_price);
+  const payout = Number(proposal.payout);
+
+  if (!Number.isFinite(askPrice) || askPrice <= 0) {
+    throw new Error(
+      "O preço da proposta é inválido."
+    );
+  }
+
+  if (!Number.isFinite(payout) || payout <= 0) {
+    throw new Error(
+      "O payout da proposta é inválido."
+    );
+  }
+
+  if (
+    typeof proposal.longcode !== "string" ||
+    proposal.longcode.trim().length === 0
+  ) {
+    throw new Error(
+      "A descrição da proposta não foi recebida."
+    );
+  }
+
+  // Confirmar os parâmetros devolvidos, quando disponíveis.
+  const echoed = response.echo_req;
+
+  if (echoed) {
+
+    if (
+      echoed.underlying_symbol &&
+      echoed.underlying_symbol !== symbol
+    ) {
+      throw new Error(
+        "A proposta devolvida pertence a outro índice."
+      );
+    }
+
+    if (
+      echoed.contract_type &&
+      echoed.contract_type !== contractType
+    ) {
+      throw new Error(
+        "O tipo de contrato devolvido não corresponde ao pedido."
+      );
+    }
+
+    if (
+      echoed.currency &&
+      echoed.currency !== account.currency
+    ) {
+      throw new Error(
+        "A moeda da proposta não corresponde à conta."
+      );
+    }
+  }
+
+  // =========================================================
+  // 6. REGISTAR O RESULTADO — SEM COMPRAR
+  // =========================================================
+
+  console.log(
+    "TradeProJB: Proposta validada com sucesso:",
+    {
+      account_id: connectedAccountId,
+      proposal_id: proposal.id,
+      contract_type: contractType,
+      symbol: symbol,
+      ask_price: askPrice,
+      payout: payout,
+      longcode: proposal.longcode
+    }
+  );
 
   return proposal;
 }
-
 
 // ============================================================
 // TRADEPROJB — ACOMPANHAMENTO OPTIONS API

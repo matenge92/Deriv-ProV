@@ -1340,7 +1340,8 @@ function sendOptionsRequest(payload, timeout = 15000) {
         "Options API não está ligada à conta Demo. Compra não enviada."
       );
     }
-    
+
+    const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
     const requestId = ++optionsRequestId;
 
         const timer = setTimeout(function () {
@@ -1370,7 +1371,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
           createdAt: Date.now(),
           payload: payload,
           socket: socket,
-          isBuy: Object.prototype.hasOwnProperty.call(payload, "buy"),
+          isBuy: isBuy,
           sent: false
         };
     

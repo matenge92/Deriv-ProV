@@ -1700,13 +1700,27 @@ if (!sessionAndParametersValid) {
     );
   }
 
+  
   // Confirmar os parâmetros devolvidos, quando disponíveis.
   const echoed = response.echo_req;
 
-  if (echoed) {
+  if (
+    echoed !== undefined &&
+    (!echoed || typeof echoed !== "object" || Array.isArray(echoed))
+  ) {
+    throw new Error(
+      "A resposta da Deriv contém parâmetros echo_req inválidos."
+    );
+  }
 
+  if (echoed) {
+    const hasEcho = function (key) {
+      return Object.prototype.hasOwnProperty.call(echoed, key);
+    };
+
+    // 1. Confirmar índice
     if (
-      echoed.underlying_symbol &&
+      hasEcho("underlying_symbol") &&
       echoed.underlying_symbol !== symbol
     ) {
       throw new Error(
@@ -1714,8 +1728,9 @@ if (!sessionAndParametersValid) {
       );
     }
 
+    // 2. Confirmar tipo de contrato
     if (
-      echoed.contract_type &&
+      hasEcho("contract_type") &&
       echoed.contract_type !== contractType
     ) {
       throw new Error(
@@ -1723,15 +1738,73 @@ if (!sessionAndParametersValid) {
       );
     }
 
+    // 3. Confirmar moeda
     if (
-      echoed.currency &&
-      echoed.currency !== account.currency
+      hasEcho("currency") &&
+      echoed.currency !== currency
     ) {
       throw new Error(
         "A moeda da proposta não corresponde à conta."
       );
     }
+
+    // 4. Confirmar valor da aposta
+    if (
+      hasEcho("amount") &&
+      (
+        !Number.isFinite(Number(echoed.amount)) ||
+        Number(echoed.amount) !== stake
+      )
+    ) {
+      throw new Error(
+        "O valor da proposta não corresponde ao valor solicitado."
+      );
+    }
+
+    // 5. Confirmar base da aposta
+    if (
+      hasEcho("basis") &&
+      echoed.basis !== "stake"
+    ) {
+      throw new Error(
+        "A base da proposta não corresponde a stake."
+      );
+    }
+
+    // 6. Confirmar duração
+    if (
+      hasEcho("duration") &&
+      (
+        !Number.isFinite(Number(echoed.duration)) ||
+        Number(echoed.duration) !== duration
+      )
+    ) {
+      throw new Error(
+        "A duração devolvida não corresponde ao pedido."
+      );
+    }
+
+    // 7. Confirmar unidade de duração
+    if (
+      hasEcho("duration_unit") &&
+      echoed.duration_unit !== durationUnit
+    ) {
+      throw new Error(
+        "A unidade de duração não corresponde ao pedido."
+      );
+    }
+
+    // 8. Confirmar barreira, quando aplicável
+    if (
+      hasEcho("barrier") &&
+      String(echoed.barrier) !== proposalBarrier
+    ) {
+      throw new Error(
+        "A barreira devolvida não corresponde à previsão solicitada."
+      );
+    }
   }
+
 
   // =========================================================
   // 6. REGISTAR O RESULTADO — SEM COMPRAR

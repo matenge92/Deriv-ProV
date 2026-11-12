@@ -1550,12 +1550,16 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
   if (digitContracts.includes(contractType)) {
 
-    const prediction = Number(
-  isRecoveryAtRequest
-    ? recoveryPred(contractType)
-    : bot.prediction
-      
-    );
+   const rawPrediction = isRecoveryAtRequest
+  ? recoveryPred(contractType)
+  : bot.prediction;
+
+const prediction =
+  rawPrediction === null ||
+  rawPrediction === undefined ||
+  (typeof rawPrediction === "string" && rawPrediction.trim() === "")
+    ? NaN
+    : Number(rawPrediction);
 
     if (
       !Number.isInteger(prediction) ||
@@ -1601,12 +1605,17 @@ const currentAccount = derivAccounts.find(function (item) {
 let currentBarrier = null;
 
 if (digitContracts.includes(contractType)) {
-  const currentPrediction = Number(
-    bot.isRecovery
-      ? recoveryPred(contractType)
-      : bot.prediction
-  );
+  const rawCurrentPrediction = bot.isRecovery
+  ? recoveryPred(contractType)
+  : bot.prediction;
 
+const currentPrediction =
+  rawCurrentPrediction === null ||
+  rawCurrentPrediction === undefined ||
+  (typeof rawCurrentPrediction === "string" && rawCurrentPrediction.trim() === "")
+    ? NaN
+    : Number(rawCurrentPrediction);
+  
   if (
     Number.isInteger(currentPrediction) &&
     currentPrediction >= 0 &&

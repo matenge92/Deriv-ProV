@@ -1383,11 +1383,11 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
       const pendingRequest = pendingOptionsRequests[requestId];
 
+      socket.send(message);
       // Considerar a compra enviada antes de chamar socket.send.
       // Se houver uma excepção, o resultado será tratado como UNKNOWN.
       pendingRequest.sent = isBuy;
 
-      socket.send(message);
 
       console.log(
         "TradeProJB: Pedido Options API enviado:",

@@ -1796,11 +1796,12 @@ if (!sessionAndParametersValid) {
 
     // 8. Confirmar barreira, quando aplicável
     if (
+      digitContracts.includes(contractType) &&
       hasEcho("barrier") &&
       String(echoed.barrier) !== proposalBarrier
     ) {
       throw new Error(
-        "A barreira devolvida não corresponde à previsão solicitada."
+    "A barreira devolvida não corresponde à previsão solicitada."
       );
     }
   }

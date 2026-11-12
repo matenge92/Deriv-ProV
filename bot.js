@@ -1384,8 +1384,8 @@ function sendOptionsRequest(payload, timeout = 15000) {
       const pendingRequest = pendingOptionsRequests[requestId];
 
       socket.send(message);
-      // Considerar a compra enviada antes de chamar socket.send.
-      // Se houver uma excepção, o resultado será tratado como UNKNOWN.
+      
+      // Só marcar como enviada depois de socket.send aceitar a mensagem.
       pendingRequest.sent = isBuy;
 
 

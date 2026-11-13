@@ -2060,16 +2060,19 @@ proposalContexts.set(proposal, {
 });
 
 // Activar o bloqueio de compra.
+// Activar o bloqueio de compra.
 app.purchaseInProgress = true;
 
 try {
-  let response; 
-  
-  response = await sendOptionsRequest({
-  buy: proposal.id,
-  price: maxPrice
-});
-  
+  let response;
+
+  // Enviar a compra e tratar os erros do pedido.
+  try {
+    response = await sendOptionsRequest({
+      buy: proposal.id,
+      price: maxPrice
+    });
+
   } catch (error) {
 
     purchaseAttempt.updatedAt = Date.now();

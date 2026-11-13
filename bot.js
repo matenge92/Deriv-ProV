@@ -893,37 +893,159 @@ socket.onmessage = function (event) {
     console.warn("TradeProJB: mensagem WebSocket não reconhecida.");
     return;
   }
+ 
+// Resolver pedidos da Options API e reconciliar compras tardias
+const requestKey = message.req_id
+  ? String(message.req_id)
+  : null;
 
-    // Resolver pedidos da Options API
-  const optionsPending = message.req_id
-    ? pendingOptionsRequests[message.req_id]
+const optionsPending = requestKey
+  ? pendingOptionsRequests[requestKey]
+  : null;
+
+if (optionsPending) {
+  delete pendingOptionsRequests[requestKey];
+  clearTimeout(optionsPending.timer);
+
+  const reconciliation = optionsPending.isBuy
+    ? pendingBuyReconciliations[requestKey]
     : null;
 
-  if (optionsPending) {
-    delete pendingOptionsRequests[message.req_id];
+  if (message.error) {
+    const apiError = new Error(
+      message.error.message || "Erro da Options API."
+    );
 
-    clearTimeout(optionsPending.timer);
+    apiError.code = "DERIV_REJECTED";
+    apiError.deriv_error = message.error;
 
-        if (message.error) {
-      const apiError = new Error(
-        message.error.message || "Erro da Options API."
+    if (reconciliation) {
+      reconciliation.attempt.status = "REJECTED";
+      reconciliation.attempt.updatedAt = Date.now();
+      reconciliation.attempt.reason = apiError.message;
+
+      delete pendingBuyReconciliations[requestKey];
+    }
+
+    optionsPending.reject(apiError);
+
+  } else {
+  if (
+    reconciliation &&
+    message.msg_type === "buy" &&
+    message.buy
+  ) {
+    // A resposta normal chegou.
+    // Mantemos o registo até buyContractOptions validar
+    // integralmente a confirmação da compra.
+    reconciliation.responseReceived = true;
+    reconciliation.responseReceivedAt = Date.now();
+  }
+
+  optionsPending.resolve(message);
+}
+
+  console.log(
+    "TradeProJB: Resposta Options API recebida:",
+    message.req_id,
+    message.msg_type
+  );
+
+} else if (requestKey && pendingBuyReconciliations[requestKey]) {
+
+  // ----------------------------------------------------------
+  // RECONCILIAÇÃO DE UMA RESPOSTA DE COMPRA TARDIA
+  // ----------------------------------------------------------
+
+  const reconciliation =
+    pendingBuyReconciliations[requestKey];
+
+  const attempt = reconciliation.attempt;
+
+  if (
+    reconciliation.request_id === Number(message.req_id) &&
+    reconciliation.account_id === attempt.account_id &&
+    reconciliation.socket === attempt.socket
+  ) {
+
+    if (message.error) {
+      // A Deriv rejeitou explicitamente a compra.
+      attempt.status = "REJECTED";
+      attempt.updatedAt = Date.now();
+      attempt.reason =
+        message.error.message || "Compra rejeitada pela Deriv.";
+
+      console.error(
+        "TradeProJB: Compra tardia rejeitada pela Deriv:",
+        attempt
       );
 
-      apiError.code = "DERIV_REJECTED";
-      apiError.deriv_error = message.error;
+      delete pendingBuyReconciliations[requestKey];
 
-      optionsPending.reject(apiError);
+    } else if (
+      message.msg_type === "buy" &&
+      message.buy &&
+      Number.isSafeInteger(Number(message.buy.contract_id)) &&
+      Number(message.buy.contract_id) > 0
+    ) {
+      // Confirmação tardia com contract_id válido.
+      const buy = message.buy;
+      const contractId = Number(buy.contract_id);
+      const actualPrice = Number(buy.buy_price);
+
+      attempt.status = "CONFIRMED";
+      attempt.updatedAt = Date.now();
+      attempt.contract_id = contractId;
+      attempt.transaction_id = buy.transaction_id || null;
+      attempt.actual_buy_price =
+        Number.isFinite(actualPrice) && actualPrice > 0
+          ? actualPrice
+          : null;
+      attempt.purchase_time = buy.purchase_time || null;
+      attempt.longcode = buy.longcode || null;
+
+      if (
+        !Number.isFinite(actualPrice) ||
+        actualPrice <= 0
+      ) {
+        attempt.priceAnomaly = "Preço efectivo inválido.";
+      } else if (
+        actualPrice > Number(attempt.requested_price) + 0.00000001
+      ) {
+        attempt.priceAnomaly =
+          "Preço efectivo acima do limite autorizado.";
+      }
+
+      console.warn(
+        "TradeProJB: COMPRA TARDIA CONFIRMADA:",
+        {
+          request_id: message.req_id,
+          contract_id: contractId,
+          transaction_id: attempt.transaction_id,
+          actual_buy_price: attempt.actual_buy_price,
+          priceAnomaly: attempt.priceAnomaly || null
+        }
+      );
+
+      delete pendingBuyReconciliations[requestKey];
 
     } else {
-      optionsPending.resolve(message);
+      // Não eliminar o registo: a resposta não permite
+      // confirmar nem rejeitar com segurança.
+      console.error(
+        "TradeProJB: Resposta tardia sem confirmação válida. " +
+        "A compra continua sob reconciliação.",
+        message
+      );
     }
-    
-    console.log(
-      "TradeProJB: Resposta Options API recebida:",
-      message.req_id,
-      message.msg_type
+
+  } else {
+    console.error(
+      "TradeProJB: Resposta tardia não corresponde à tentativa original.",
+      message.req_id
     );
   }
+}
   
   // Confirmar respostas dos pedidos de subscrição
   const completedRequest = message.req_id

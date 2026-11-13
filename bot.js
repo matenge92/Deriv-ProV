@@ -1323,16 +1323,18 @@ function sendSubscriptionRequest(socket, payload, action, symbol) {
   return requestId;
 }
 
+
 // ============================================================
 // TRADEPROJB — SISTEMA DE PEDIDOS OPTIONS API
+// COM REGISTO DE RECONCILIAÇÃO DE COMPRAS
 // ============================================================
 
 function sendOptionsRequest(payload, timeout = 15000) {
   return new Promise(function (resolve, reject) {
 
-    
     const accountId = String(app.connectedAccountId || "");
     const socket = ws;
+
     if (
       !socket ||
       socket.readyState !== WebSocket.OPEN ||
@@ -1346,51 +1348,87 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
     const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
     const requestId = ++optionsRequestId;
+    const requestKey = String(requestId);
 
-        const timer = setTimeout(function () {
-          const pending = pendingOptionsRequests[requestId];
+    // Associar a compra à tentativa actualmente autorizada.
+    if (isBuy) {
+      const attempt = app.lastPurchaseAttempt;
 
-          if (pending) {
-            delete pendingOptionsRequests[requestId];
+      if (
+        !attempt ||
+        attempt.status !== "PENDING" ||
+        String(attempt.proposal_id) !== String(payload.buy)
+      ) {
+        throw new Error(
+          "Tentativa de compra não validada. Envio bloqueado."
+        );
+      }
 
-            const timeoutError = new Error(
-              pending.isBuy && pending.sent
-              ? "UNKNOWN: a compra foi enviada, mas não chegou confirmação."
-              : "Tempo esgotado no pedido Options API: " + requestId
-            );
+      attempt.request_id = requestId;
 
-            if (pending.isBuy && pending.sent) {
-              timeoutError.code = "BUY_UNKNOWN";
-            }
+      pendingBuyReconciliations[requestKey] = {
+        request_id: requestId,
+        proposal_id: String(payload.buy),
+        account_id: accountId,
+        socket: socket,
+        attempt: attempt,
+        createdAt: Date.now(),
+        timedOut: false
+      };
+    }
 
-            reject(timeoutError);
+    const timer = setTimeout(function () {
+      const pending = pendingOptionsRequests[requestKey];
+
+      if (pending) {
+        delete pendingOptionsRequests[requestKey];
+
+        const timeoutError = new Error(
+          pending.isBuy && pending.sent
+            ? "UNKNOWN: a compra foi enviada, mas não chegou confirmação."
+            : "Tempo esgotado no pedido Options API: " + requestId
+        );
+
+        if (pending.isBuy && pending.sent) {
+          timeoutError.code = "BUY_UNKNOWN";
+
+          const reconciliation =
+            pendingBuyReconciliations[requestKey];
+
+          if (reconciliation) {
+            reconciliation.timedOut = true;
+            reconciliation.timedOutAt = Date.now();
           }
-        }, timeout);
-    
-        pendingOptionsRequests[requestId] = {
-          resolve: resolve,
-          reject: reject,
-          timer: timer,
-          createdAt: Date.now(),
-          payload: payload,
-          socket: socket,
-          isBuy: isBuy,
-          sent: false
-        };
-    
+        }
+
+        reject(timeoutError);
+      }
+    }, timeout);
+
+    pendingOptionsRequests[requestKey] = {
+      resolve: resolve,
+      reject: reject,
+      timer: timer,
+      createdAt: Date.now(),
+      payload: payload,
+      socket: socket,
+      accountId: accountId,
+      isBuy: isBuy,
+      sent: false
+    };
+
     try {
-          const message = JSON.stringify({
-            ...payload,
+      const message = JSON.stringify({
+        ...payload,
         req_id: requestId
       });
 
-      const pendingRequest = pendingOptionsRequests[requestId];
+      const pendingRequest = pendingOptionsRequests[requestKey];
 
       socket.send(message);
-      
-      // Só marcar como enviada depois de socket.send aceitar a mensagem.
-      pendingRequest.sent = isBuy;
 
+      // Marcar como enviada depois de socket.send aceitar a mensagem.
+      pendingRequest.sent = isBuy;
 
       console.log(
         "TradeProJB: Pedido Options API enviado:",
@@ -1399,41 +1437,33 @@ function sendOptionsRequest(payload, timeout = 15000) {
       );
 
     } catch (error) {
-      const pendingRequest = pendingOptionsRequests[requestId];
+      const pendingRequest = pendingOptionsRequests[requestKey];
 
       clearTimeout(timer);
-      delete pendingOptionsRequests[requestId];
+      delete pendingOptionsRequests[requestKey];
 
-          if (pendingRequest && pendingRequest.isBuy) {
-        
-            if (pendingRequest.sent) {
-              const unknownError = new Error(
-                "UNKNOWN: não foi possível confirmar o envio ou resultado da compra."
-              );
-              
-              unknownError.code = "BUY_UNKNOWN";
-              unknownError.cause = error;
+      // O envio falhou antes de ser aceite pelo socket.
+      if (isBuy) {
+        delete pendingBuyReconciliations[requestKey];
+      }
 
-    
-              reject(unknownError);
-              return;
-            }
+      if (pendingRequest && pendingRequest.isBuy) {
+        const notSentError = new Error(
+          "A compra não chegou a ser enviada."
+        );
 
-            const notSentError = new Error(
-              "A compra não chegou a ser enviada."
-            );
+        notSentError.code = "REQUEST_NOT_SENT";
+        notSentError.cause = error;
 
-            notSentError.code = "REQUEST_NOT_SENT";
-            notSentError.cause = error;
+        reject(notSentError);
+        return;
+      }
 
-            reject(notSentError);
-            return;
-          }
-          reject(error);
-        }
+      reject(error);
+    }
   });
 }
-    
+  
     async function requestContractProposal() {
 
   // =========================================================

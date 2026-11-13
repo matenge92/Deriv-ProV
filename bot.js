@@ -3041,29 +3041,68 @@ function toggleBot() {
   }
 }
 
-// ==================== CONNECT / START / STOP ====================
 
 function startBot() {
-  // BLOQUEIO DE SEGURANÇA:
-  // O motor de operações ainda usa mensagens da API WebSocket antiga (v3).
-  // Não permitir compras até migrarmos e validarmos o protocolo Options API.
-  if (!app.wsReady || app.connectedAccountType !== "demo") {
-    alert("Ligue primeiro uma conta DEMO da Deriv.");
+  // 1. SEGURANÇA: permitir apenas conta DEMO ligada
+  if (
+    !app.wsReady ||
+    app.connectedAccountType !== "demo" ||
+    !ws ||
+    ws.readyState !== WebSocket.OPEN
+  ) {
+    alert("Ligue primeiro uma conta DEMO da Deriv através da Options API.");
     return;
   }
 
-  alert("Ligação Demo confirmada. As operações continuam bloqueadas enquanto migramos o protocolo de negociação para a Options API.");
-  return;
+  // 2. VALIDAR SÍMBOLO E SUBSCRIÇÃO
+  const selectedSymbol = $("cfgSymbol").value;
 
-  bot.initialStake = parseFloat($("cfgStake").value) || 0.35;
-  bot.stopLoss = parseFloat($("cfgSL").value) || 10;
-  bot.takeProfit = parseFloat($("cfgTP").value) || 50;
-  bot.dailyTarget = parseFloat($("cfgDaily").value) || 100;
-  bot.symbol = $("cfgSymbol").value;
-  bot.duration = parseInt($("cfgDuration").value) || 1;
-  bot.durationType = $("cfgDurType").value;
+  if (!selectedSymbol || selectedSymbol !== activeTickSymbol) {
+    alert(
+      "O símbolo seleccionado ainda não está sincronizado com a subscrição de ticks."
+    );
+    return;
+  }
+
+  // 3. VALIDAR DADOS RECEBIDOS
+  if (!Array.isArray(ticks) || ticks.length < 20) {
+    alert(
+      "Aguarde até receber pelo menos 20 ticks válidos para iniciar a análise."
+    );
+    return;
+  }
+
+  // 4. LER E VALIDAR CONFIGURAÇÕES
+  const initialStake = Number($("cfgStake").value);
+  const stopLoss = Number($("cfgSL").value);
+  const takeProfit = Number($("cfgTP").value);
+  const dailyTarget = Number($("cfgDaily").value);
+  const duration = Number($("cfgDuration").value);
+  const durationType = $("cfgDurType").value;
+
+  if (
+    !Number.isFinite(initialStake) || initialStake <= 0 ||
+    !Number.isFinite(stopLoss) || stopLoss <= 0 ||
+    !Number.isFinite(takeProfit) || takeProfit <= 0 ||
+    !Number.isFinite(dailyTarget) || dailyTarget <= 0 ||
+    !Number.isInteger(duration) || duration <= 0 ||
+    !durationType
+  ) {
+    alert("Verifique os valores das configurações antes de continuar.");
+    return;
+  }
+
+  // 5. PREPARAR O ESTADO DO NOVO MOTOR
+  bot.initialStake = initialStake;
+  bot.stopLoss = stopLoss;
+  bot.takeProfit = takeProfit;
+  bot.dailyTarget = dailyTarget;
+  bot.symbol = selectedSymbol;
+  bot.duration = duration;
+  bot.durationType = durationType;
   bot.prediction = selectedDigit;
-  bot.currentStake = bot.initialStake;
+
+  bot.currentStake = initialStake;
   bot.totalProfit = 0;
   bot.totalTrades = 0;
   bot.wins = 0;
@@ -3075,18 +3114,27 @@ function startBot() {
   bot.history = [];
   bot.manipulationDetected = false;
   bot.skippedTrades = 0;
+
   antiManip.digitHistory = [];
   antiManip.cooldownTrades = 0;
-  $("historyList").innerHTML =
-    '<div class="empty-state">Nenhum trade realizado ainda</div>';
-  bot.running = true;
-  $("btnStart").style.display = "none";
-  $("btnStop").style.display = "flex";
-  document.querySelectorAll(".input-field, .digit-btn").forEach(function (e) {
-    e.disabled = true;
-  });
+
+  // 6. PREPARAÇÃO CONCLUÍDA — SEM COMPRAS
+  bot.running = false;
+
   updateUI();
-  runBot();
+
+  alert(
+    "TradeProJB: configuração validada e novo motor Options API preparado. Nenhuma operação foi executada."
+  );
+
+  console.log("[TradeProJB] Preparação Options API concluída.", {
+    symbol: bot.symbol,
+    stake: bot.initialStake,
+    duration: bot.duration,
+    durationType: bot.durationType,
+    ticksReceived: ticks.length,
+    accountType: app.connectedAccountType
+  });
 }
 
 function stopBot() {

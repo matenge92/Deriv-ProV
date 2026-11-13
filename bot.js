@@ -2194,15 +2194,34 @@ currentBarrier = String(currentPrediction);
   );
 
     const purchaseAttempt = {
-    status: "PENDING",
-    proposal_id: proposal.id,
-    account_id: accountId,
-    socket: socket,
-    requested_price: maxPrice,
-    startedAt: Date.now(),
-    contract_id: null,
-    transaction_id: null
-  };
+  status: "PENDING",
+  proposal_id: proposal.id,
+  account_id: accountId,
+  socket: socket,
+
+  requested_price: maxPrice,
+  stake: proposalContext.stake,
+  contract_type: proposalContext.contract_type,
+  symbol: proposalContext.symbol,
+  duration: proposalContext.duration,
+  duration_unit: proposalContext.duration_unit,
+
+  startedAt: Date.now(),
+  updatedAt: null,
+
+  request_id: null,
+  contract_id: null,
+  transaction_id: null,
+
+  actual_buy_price: null,
+  purchase_time: null,
+  longcode: null,
+
+  monitorStatus: "NOT_STARTED",
+  monitorError: null,
+  lastContractUpdate: null,
+  finalContract: null
+};
 
   app.lastPurchaseAttempt = purchaseAttempt;
 

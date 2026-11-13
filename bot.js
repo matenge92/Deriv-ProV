@@ -3559,6 +3559,20 @@ async function startBot() {
     return;
   }
 
+    // Bloquear uma nova tentativa enquanto a primeira não estiver resolvida.
+  if (
+    app.lastPurchaseAttempt &&
+    ["PENDING", "UNKNOWN", "CONFIRMED"].includes(
+      app.lastPurchaseAttempt.status
+    )
+  ) {
+    alert(
+      "Já existe uma tentativa de compra registada. " +
+      "Verifique o seu estado antes de continuar."
+    );
+    return;
+  }
+
     // Impedir nova compra enquanto existir uma tentativa não resolvida.
   if (
     app.lastPurchaseAttempt &&
@@ -3695,44 +3709,47 @@ async function startBot() {
     );
 
     
-    // 9. VALIDAR O PREÇO E A MOEDA DA PROPOSTA
+    
+    // 9. VALIDAR O PREÇO DA PROPOSTA
     const askPrice = Number(proposal.ask_price);
 
-    if (
+        if (
       !Number.isFinite(askPrice) ||
       askPrice <= 0 ||
       Math.abs(askPrice - initialStake) > 0.00000001 ||
       proposal.currency !== "USD"
     ) {
       throw new Error(
-        "A proposta não corresponde ao preço ou à moeda autorizada. Compra bloqueada."
+        "Preço da proposta inválido ou diferente da stake autorizada."
       );
     }
 
-    // 10. PEDIR AUTORIZAÇÃO ANTES DA COMPRA
+    // 10. PEDIR CONFIRMAÇÃO MANUAL
     const authorized = confirm(
-      "CONFIRMAR PRIMEIRA COMPRA — DEMO\n\n" +
+      "PRIMEIRA COMPRA — CONTA DEMO\n\n" +
       "Índice: " + bot.symbol + "\n" +
       "Contrato: DIGITDIFF\n" +
       "Dígito: " + bot.prediction + "\n" +
       "Stake: " + askPrice.toFixed(2) + " USD\n" +
-      "Duração: 1 tick\n" +
+      "Duração: " + bot.duration + " tick(s)\n" +
       "Payout: " + proposal.payout + "\n\n" +
       "Será enviada apenas UMA compra.\n" +
-      "Sem repetição automática e sem recuperação.\n\n" +
-      "Deseja confirmar?"
+      "Sem repetição automática.\n" +
+      "Sem recuperação.\n\n" +
+      "Confirma a compra?"
     );
 
     if (!authorized) {
       console.log(
-        "TradeProJB: Compra cancelada pelo utilizador. Nenhuma compra enviada."
+        "TradeProJB: Compra cancelada pelo utilizador."
       );
       return;
     }
 
-    // 11. EXECUTAR UMA ÚNICA COMPRA
+    // 11. ENVIAR UMA ÚNICA COMPRA
     console.log(
-      "TradeProJB: Autorização recebida. A enviar compra única."
+      "TradeProJB: A enviar compra autorizada:",
+      proposal.id
     );
 
     const result = await buyContractOptions(
@@ -3740,9 +3757,8 @@ async function startBot() {
       askPrice
     );
 
-    // 12. APRESENTAR O RESULTADO
     console.log(
-      "TradeProJB: Resultado da primeira compra:",
+      "TradeProJB: Resultado da compra:",
       result
     );
 
@@ -3753,6 +3769,7 @@ async function startBot() {
       "Acompanhamento: " + result.monitorStatus + "\n\n" +
       "Não será iniciada outra compra automaticamente."
     );
+
 
 
   } catch (error) {

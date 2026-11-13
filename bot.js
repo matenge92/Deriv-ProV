@@ -2516,6 +2516,166 @@ async function stopContractMonitor(contractId) {
 }
 
 
+async function attachPurchaseMonitor(attempt) {
+  if (!attempt || attempt.status !== "CONFIRMED") {
+    throw new Error(
+      "Só é possível acompanhar uma compra confirmada."
+    );
+  }
+
+  if (
+    !attempt.contract_id ||
+    !Number.isSafeInteger(Number(attempt.contract_id)) ||
+    Number(attempt.contract_id) <= 0
+  ) {
+    throw new Error("ID do contrato inválido para acompanhamento.");
+  }
+
+  const contractId = String(attempt.contract_id);
+
+  // Evitar criar duas subscrições para o mesmo contrato.
+  if (activeContractMonitors[contractId]) {
+    attempt.monitorStatus = "ACTIVE";
+    attempt.monitorError = null;
+
+    console.log(
+      "TradeProJB: Contrato já está a ser acompanhado:",
+      contractId
+    );
+
+    return true;
+  }
+
+  // Confirmar que a sessão actual é a mesma da compra.
+  const sameSession =
+    attempt.socket === ws &&
+    ws &&
+    ws.readyState === WebSocket.OPEN &&
+    app.wsReady === true &&
+    app.connectedAccountType === "demo" &&
+    String(app.connectedAccountId || "") === attempt.account_id &&
+    String(selectedAccountId || "") === attempt.account_id;
+
+  if (!sameSession) {
+    attempt.monitorStatus = "UNAVAILABLE";
+    attempt.monitorError =
+      "A compra foi confirmada, mas a sessão original já não está disponível.";
+
+    console.warn(
+      "TradeProJB: Compra confirmada; acompanhamento aguarda reconexão:",
+      contractId
+    );
+
+    return false;
+  }
+
+  if (
+    attempt.monitorStatus === "STARTING" ||
+    attempt.monitorStatus === "ACTIVE" ||
+    attempt.monitorStatus === "FINISHED"
+  ) {
+    return attempt.monitorStatus === "ACTIVE" ||
+      attempt.monitorStatus === "FINISHED";
+  }
+
+  attempt.monitorStatus = "STARTING";
+  attempt.monitorError = null;
+
+  const terminalStatuses = [
+    "won",
+    "lost",
+    "sold",
+    "cancelled"
+  ];
+
+  try {
+    await startContractMonitor(
+      contractId,
+      function (contract) {
+        if (!contract) return;
+
+        const update = {
+          contract_id: contractId,
+          status: contract.status || null,
+          profit: Number.isFinite(Number(contract.profit))
+            ? Number(contract.profit)
+            : null,
+          bid_price: Number.isFinite(Number(contract.bid_price))
+            ? Number(contract.bid_price)
+            : null,
+          is_sold: Boolean(contract.is_sold),
+          is_expired: Boolean(contract.is_expired),
+          updatedAt: Date.now()
+        };
+
+        attempt.lastContractUpdate = update;
+
+        const finished =
+          terminalStatuses.includes(
+            String(contract.status || "").toLowerCase()
+          ) ||
+          contract.is_sold === 1 ||
+          contract.is_sold === true ||
+          contract.is_expired === 1 ||
+          contract.is_expired === true;
+
+        if (finished) {
+          if (attempt.monitorStatus !== "FINISHED") {
+            attempt.finalContract = update;
+            attempt.monitorStatus = "FINISHED";
+            attempt.monitorFinishedAt = Date.now();
+
+            console.log(
+              "TradeProJB: Acompanhamento concluído:",
+              update
+            );
+          }
+        } else if (attempt.monitorStatus !== "FINISHED") {
+          attempt.monitorStatus = "ACTIVE";
+        }
+      }
+    );
+
+    // A resposta inicial pode já indicar um contrato terminado.
+    if (attempt.monitorStatus === "FINISHED") {
+      Promise.resolve(stopContractMonitor(contractId))
+        .catch(function (error) {
+          console.warn(
+            "TradeProJB: Não foi possível cancelar a subscrição final:",
+            error.message
+          );
+        });
+
+      return true;
+    }
+
+    if (attempt.monitorStatus === "STARTING") {
+      attempt.monitorStatus = "ACTIVE";
+    }
+
+    console.log(
+      "TradeProJB: Acompanhamento ligado à compra:",
+      contractId
+    );
+
+    return true;
+
+  } catch (error) {
+    attempt.monitorStatus = "FAILED";
+    attempt.monitorError = error.message;
+
+    console.error(
+      "TradeProJB: Compra confirmada, mas houve falha no acompanhamento:",
+      {
+        contract_id: contractId,
+        error: error.message
+      }
+    );
+
+    return false;
+  }
+}
+
 // ============================================================
 // TRADEPROJB — GESTÃO DINÂMICA DA SUBSCRIÇÃO DE TICKS
 // ============================================================

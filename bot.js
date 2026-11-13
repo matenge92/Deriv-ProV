@@ -3769,20 +3769,28 @@ async function startBot() {
       "Acompanhamento: " + result.monitorStatus + "\n\n" +
       "Não será iniciada outra compra automaticamente."
     );
-
-
-
+      
   } catch (error) {
 
     console.error(
-      "[TradeProJB] Erro ao solicitar proposta:",
+      "[TradeProJB] Erro durante a proposta ou compra:",
       error
     );
 
-    alert(
-      "Não foi possível obter uma proposta:\n" +
-      error.message
-    );
+    if (error.code === "BUY_UNKNOWN") {
+      alert(
+        "ATENÇÃO: ESTADO DA COMPRA DESCONHECIDO!\n\n" +
+        "A compra pode ter sido executada pela Deriv.\n" +
+        "Não clique novamente em INICIAR ROBÔ.\n" +
+        "Verifique o estado da conta e do contrato."
+      );
+
+    } else {
+      alert(
+        "Não foi possível concluir a operação:\n" +
+        error.message
+      );
+    }
 
   } finally {
 

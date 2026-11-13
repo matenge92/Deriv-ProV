@@ -1856,6 +1856,11 @@ proposalContexts.set(proposal, {
 
 async function buyContractOptions(proposal, authorizedMaxPrice) {
 
+  if (app.purchaseInProgress) {
+  throw new Error(
+    "Já existe uma compra em processamento. Aguarde a resolução."
+  );
+}
     // B4 — Bloquear novas compras com tentativa não resolvida
   if (
     app.lastPurchaseAttempt &&
@@ -1952,6 +1957,11 @@ if (
     // C-B4 — Validar o contexto original da proposta
 
   const proposalContext = proposalContexts.get(proposal);
+  if (proposalContext && proposalContext.consumed) {
+  throw new Error(
+    "Esta proposta já foi utilizada. Solicite uma nova proposta."
+  );
+}
 
   if (!proposalContext) {
     throw new Error(
@@ -1969,19 +1979,29 @@ if (
   let currentBarrier = null;
 
   if (digitContracts.includes(proposalContext.contract_type)) {
-    const currentPrediction = Number(
-      bot.isRecovery
-        ? recoveryPred(proposalContext.contract_type)
-        : bot.prediction
-    );
+    const rawPrediction = bot.isRecovery
+  ? recoveryPred(proposalContext.contract_type)
+  : bot.prediction;
 
-    if (
-      Number.isInteger(currentPrediction) &&
-      currentPrediction >= 0 &&
-      currentPrediction <= 9
-    ) {
-      currentBarrier = String(currentPrediction);
-    }
+if (
+  rawPrediction === null ||
+  rawPrediction === undefined ||
+  String(rawPrediction).trim() === ""
+) {
+  throw new Error("Dígito de previsão não seleccionado.");
+}
+
+const currentPrediction = Number(rawPrediction);
+
+if (
+  !Number.isInteger(currentPrediction) ||
+  currentPrediction < 0 ||
+  currentPrediction > 9
+) {
+  throw new Error("Dígito de previsão inválido.");
+}
+
+currentBarrier = String(currentPrediction);
   }
 
   const contextIsValid =
@@ -2032,14 +2052,24 @@ if (
 
   app.lastPurchaseAttempt = purchaseAttempt;
 
-  let response;
+// Marcar a proposta como utilizada antes do envio.
+proposalContexts.set(proposal, {
+  ...proposalContext,
+  consumed: true,
+  consumed_at: Date.now()
+});
 
-  try {
-    response = await sendOptionsRequest({
-      buy: proposal.id,
-      price: maxPrice
-    });
+// Activar o bloqueio de compra.
+app.purchaseInProgress = true;
 
+try {
+  let response; 
+  
+  response = await sendOptionsRequest({
+  buy: proposal.id,
+  price: maxPrice
+});
+  
   } catch (error) {
 
     purchaseAttempt.updatedAt = Date.now();
@@ -2209,15 +2239,16 @@ const result = {
   priceAnomaly: priceAnomaly
 };
 
-  
   console.log(
     "TradeProJB: Compra Options API validada:",
     result
   );
 
   return result;
+  } finally {
+  app.purchaseInProgress = false;
 }
-
+}
 
 // ============================================================
 // TRADEPROJB — ACOMPANHAMENTO OPTIONS API

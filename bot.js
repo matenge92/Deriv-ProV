@@ -1027,18 +1027,68 @@ if (optionsPending) {
       }
 
       console.warn(
-        "TradeProJB: COMPRA TARDIA CONFIRMADA:",
+  "TradeProJB: COMPRA TARDIA CONFIRMADA:",
+  {
+    request_id: message.req_id,
+    contract_id: contractId,
+    transaction_id: attempt.transaction_id,
+    actual_buy_price: attempt.actual_buy_price,
+    priceAnomaly: attempt.priceAnomaly || null
+  }
+);
+
+// Impedir tentativas simultâneas de iniciar o acompanhamento.
+if (!reconciliation.monitorAttachInProgress) {
+  reconciliation.monitorAttachInProgress = true;
+
+  Promise.resolve()
+    .then(function () {
+      return attachPurchaseMonitor(attempt);
+    })
+    .then(function (monitorStarted) {
+
+      reconciliation.monitorAttachInProgress = false;
+
+      if (
+        monitorStarted &&
+        ["ACTIVE", "FINISHED"].includes(attempt.monitorStatus)
+      ) {
+        if (
+          pendingBuyReconciliations[requestKey] === reconciliation
+        ) {
+          delete pendingBuyReconciliations[requestKey];
+        }
+
+        console.log(
+          "TradeProJB: Compra tardia reconciliada e acompanhamento confirmado:",
+          contractId
+        );
+
+      } else {
+        console.warn(
+          "TradeProJB: Compra confirmada, mas acompanhamento ainda indisponível. " +
+          "O registo de reconciliação foi preservado.",
+          {
+            contract_id: contractId,
+            monitorStatus: attempt.monitorStatus
+          }
+        );
+      }
+    })
+    .catch(function (error) {
+
+      reconciliation.monitorAttachInProgress = false;
+
+      console.error(
+        "TradeProJB: Falha ao iniciar acompanhamento da compra tardia. " +
+        "A reconciliação foi preservada.",
         {
-          request_id: message.req_id,
           contract_id: contractId,
-          transaction_id: attempt.transaction_id,
-          actual_buy_price: attempt.actual_buy_price,
-          priceAnomaly: attempt.priceAnomaly || null
+          error: error.message
         }
       );
-
-      delete pendingBuyReconciliations[requestKey];
-
+    });
+}
     } else {
       // Não eliminar o registo: a resposta não permite
       // confirmar nem rejeitar com segurança.
@@ -2427,12 +2477,40 @@ const result = {
   priceAnomaly: priceAnomaly
 };
 
-  console.log(
+    console.log(
     "TradeProJB: Compra Options API validada:",
     result
   );
 
+  // 7. INICIAR O ACOMPANHAMENTO DO CONTRATO
+  const monitorStarted = await attachPurchaseMonitor(
+    purchaseAttempt
+  );
+
+  result.monitorStatus = purchaseAttempt.monitorStatus;
+  result.monitorStarted = monitorStarted;
+
+  // A confirmação normal já foi validada.
+  // A reconciliação deixa de ser necessária neste percurso.
+  if (purchaseAttempt.request_id !== null &&
+      purchaseAttempt.request_id !== undefined) {
+    delete pendingBuyReconciliations[
+      String(purchaseAttempt.request_id)
+    ];
+  }
+
+  console.log(
+    "TradeProJB: Estado final da compra e acompanhamento:",
+    {
+      contract_id: contractId,
+      purchase_status: purchaseAttempt.status,
+      monitor_status: purchaseAttempt.monitorStatus,
+      monitor_started: monitorStarted
+    }
+  );
+
   return result;
+  
   } finally {
   app.purchaseInProgress = false;
 }

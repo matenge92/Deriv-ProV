@@ -74,12 +74,12 @@ function cleanupPendingRequestsForSocket(socket) {
   });
 }
 const app = {
-  status: "idle", // idle | connecting | connected | running
+  status: "idle",
   token: null,
   wsReady: false,
   connectedAccountType: null,
   connectedAccountId: null,
-  lastPurchaseAttempt: null
+  lastPurchaseAttempt: null,
   purchaseInProgress: false
 };
 // CONTAS DERIV

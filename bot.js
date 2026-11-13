@@ -35,6 +35,7 @@ let subscriptionReqId = 3000;
 let pendingSubscriptionRequests = {};
 let symbolChangeInProgress = false;
 
+
 // Limpar apenas os pedidos pertencentes ao socket que fechou
 function cleanupPendingRequestsForSocket(socket) {
   let optionsCleaned = 0;
@@ -46,18 +47,57 @@ function cleanupPendingRequestsForSocket(socket) {
       clearTimeout(request.timer);
       delete pendingOptionsRequests[id];
 
-            const closeError = new Error(
-        request.isBuy && request.sent
-          ? "UNKNOWN: ligação fechada durante a confirmação da compra."
-          : "Ligação WebSocket fechada antes da resposta."
-      );
+      const requestKey = String(id);
+      const reconciliation = pendingBuyReconciliations[requestKey];
+
+      let closeError;
 
       if (request.isBuy && request.sent) {
+        closeError = new Error(
+          "UNKNOWN: ligação fechada durante a confirmação da compra."
+        );
         closeError.code = "BUY_UNKNOWN";
+
+        // A compra foi enviada: preservar o registo para reconciliação.
+        if (reconciliation) {
+          reconciliation.timedOut = true;
+          reconciliation.connectionClosed = true;
+          reconciliation.connectionClosedAt = Date.now();
+
+          const attempt = reconciliation.attempt;
+
+          if (attempt) {
+            if (attempt.status === "PENDING") {
+              attempt.status = "UNKNOWN";
+            }
+
+            attempt.updatedAt = Date.now();
+            attempt.unknownReason =
+              "O WebSocket fechou depois do envio da compra, antes da confirmação.";
+          }
+        }
+
+      } else if (request.isBuy) {
+        closeError = new Error(
+          "REQUEST_NOT_SENT: a compra não chegou a ser enviada."
+        );
+        closeError.code = "REQUEST_NOT_SENT";
+
+        // A compra não foi enviada: não há compra a reconciliar.
+        delete pendingBuyReconciliations[requestKey];
+
+        if (reconciliation && reconciliation.attempt) {
+          reconciliation.attempt.status = "NOT_SENT";
+          reconciliation.attempt.updatedAt = Date.now();
+        }
+
+      } else {
+        closeError = new Error(
+          "Ligação WebSocket fechada antes da resposta."
+        );
       }
 
       request.reject(closeError);
-
       optionsCleaned++;
     }
   });
@@ -75,6 +115,7 @@ function cleanupPendingRequestsForSocket(socket) {
     pedidosSubscricao: subscriptionsCleaned
   });
 }
+
 const app = {
   status: "idle",
   token: null,

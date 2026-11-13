@@ -2966,24 +2966,26 @@ function delay(ms) {
   });
 }
 
-    function runBot () {
-  
+   function runBot() {
+
   if (!bot.running) return Promise.resolve();
 
   if (bot.totalProfit <= -bot.stopLoss) {
     stopBot();
     return Promise.resolve();
   }
+
   if (bot.totalProfit >= bot.takeProfit) {
     stopBot();
     return Promise.resolve();
   }
+
   if (bot.totalProfit >= bot.dailyTarget) {
     stopBot();
     return Promise.resolve();
   }
-
-  // 🛡️ ANTI-MANIPULATION                                                                                                                                                                                                                                                                    CHECK
+     
+     // 🛡️ ANTI-MANIPULATION                                                                                                                                                                                                                                                                    CHECK
   var manipCheck = antiManip.shouldSkip();
   if (manipCheck.skip) {
     bot.manipulationDetected = true;

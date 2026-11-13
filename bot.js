@@ -2966,8 +2966,6 @@ function delay(ms) {
   });
 }
 
-  Bot() {
-
     function runBot () {
   Bot() {
   if (!bot.running) return Promise.resolve();

@@ -2968,7 +2968,7 @@ function delay(ms) {
 
   Bot() {
 
-    function run() {
+    function runBot () {
   Bot() {
   if (!bot.running) return Promise.resolve();
 

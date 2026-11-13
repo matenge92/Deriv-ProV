@@ -2967,7 +2967,7 @@ function delay(ms) {
 }
 
     function runBot () {
-  Bot() {
+  
   if (!bot.running) return Promise.resolve();
 
   if (bot.totalProfit <= -bot.stopLoss) {

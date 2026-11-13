@@ -2894,7 +2894,8 @@ function processResult(profit, stake) {
       recoveryContracts[bot.recoveryIdx % recoveryContracts.length];
     bot.recoveryIdx++;
     var mult = payoutMult(bot.contractType);
-    bot.currentStake = roundUp05(bot.accLoss / (mult - 1));
+    bot.currentStake 
+      = roundUp05(bot.accLoss / (mult - 1));
     if (bot.currentStake > bot.stopLoss) bot.currentStake = bot.stopLoss;
   }
   addHistoryItem(r);
@@ -2965,7 +2966,8 @@ function delay(ms) {
   });
 }
 
-function runBot() {
+function run
+  Bot() {
   if (!bot.running) return Promise.resolve();
 
   if (bot.totalProfit <= -bot.stopLoss) {

@@ -1694,7 +1694,6 @@ function sendOptionsRequest(payload, timeout = 15000) {
   // =========================================================
   // 1. VALIDAR A LIGAÇÃO E A CONTA
   // =========================================================
-
   if (
     !ws ||
     ws.readyState !== WebSocket.OPEN ||
@@ -1705,7 +1704,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
       "A Options API não está ligada a uma conta Demo."
     );
   }
-
+      
   if (
     !selectedAccountId ||
     !app.connectedAccountId ||
@@ -3573,20 +3572,6 @@ async function startBot() {
     return;
   }
 
-    // Impedir nova compra enquanto existir uma tentativa não resolvida.
-  if (
-    app.lastPurchaseAttempt &&
-    ["PENDING", "UNKNOWN"].includes(
-      app.lastPurchaseAttempt.status
-    )
-  ) {
-    alert(
-      "Existe uma tentativa de compra pendente ou não confirmada. " +
-      "Resolva-a antes de iniciar outra operação."
-    );
-    return;
-  }
-
   // 3. VALIDAR O SÍMBOLO
   const selectedSymbol = $("cfgSymbol").value;
 
@@ -3682,7 +3667,7 @@ async function startBot() {
   antiManip.digitHistory = [];
   antiManip.cooldownTrades = 0;
 
-  // 8. SOLICITAR PROPOSTA — SEM COMPRAR
+  // 8. SOLICITAR PROPOSTA E PREPARAR COMPRA ÚNICA
   bot.proposalRequestInProgress = true;
 
   try {

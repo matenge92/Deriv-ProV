@@ -13,6 +13,8 @@ let optionsPingReqId = 900000;
 // Pedidos de negociação da Options API
 let optionsRequestId = 500000;
 let pendingOptionsRequests = {};
+// Registo de compras enviadas sem confirmação imediata
+let pendingBuyReconciliations = {};
 // Acompanhamento de contratos pela Options API
 let activeContractMonitors = {};
 // C1 — Contexto privado das propostas Options API

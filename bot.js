@@ -3559,6 +3559,20 @@ async function startBot() {
     return;
   }
 
+    // Impedir nova compra enquanto existir uma tentativa não resolvida.
+  if (
+    app.lastPurchaseAttempt &&
+    ["PENDING", "UNKNOWN"].includes(
+      app.lastPurchaseAttempt.status
+    )
+  ) {
+    alert(
+      "Existe uma tentativa de compra pendente ou não confirmada. " +
+      "Resolva-a antes de iniciar outra operação."
+    );
+    return;
+  }
+
   // 3. VALIDAR O SÍMBOLO
   const selectedSymbol = $("cfgSymbol").value;
 
@@ -3608,6 +3622,23 @@ async function startBot() {
     !["t", "s", "m", "h", "d"].includes(durationType)
   ) {
     alert("Verifique os valores das configurações.");
+    return;
+  }
+
+    // Condições fixas da primeira compra de demonstração.
+  if (
+    selectedSymbol !== "R_10" ||
+    Math.abs(initialStake - 0.35) > 0.00000001 ||
+    duration !== 1 ||
+    durationType !== "t"
+  ) {
+    alert(
+      "Primeira operação bloqueada.\n\n" +
+      "Configuração exigida:\n" +
+      "Índice: R_10\n" +
+      "Stake: 0.35 USD\n" +
+      "Duração: 1 tick"
+    );
     return;
   }
 
@@ -3663,16 +3694,66 @@ async function startBot() {
       }
     );
 
-    alert(
-      "Proposta recebida e validada com sucesso!\n\n" +
+    
+    // 9. VALIDAR O PREÇO E A MOEDA DA PROPOSTA
+    const askPrice = Number(proposal.ask_price);
+
+    if (
+      !Number.isFinite(askPrice) ||
+      askPrice <= 0 ||
+      Math.abs(askPrice - initialStake) > 0.00000001 ||
+      proposal.currency !== "USD"
+    ) {
+      throw new Error(
+        "A proposta não corresponde ao preço ou à moeda autorizada. Compra bloqueada."
+      );
+    }
+
+    // 10. PEDIR AUTORIZAÇÃO ANTES DA COMPRA
+    const authorized = confirm(
+      "CONFIRMAR PRIMEIRA COMPRA — DEMO\n\n" +
       "Índice: " + bot.symbol + "\n" +
-      "Contrato: " + bot.contractType + "\n" +
+      "Contrato: DIGITDIFF\n" +
       "Dígito: " + bot.prediction + "\n" +
-      "Stake: " + proposal.ask_price + " " + 
-      (proposal.currency || "") + "\n" +
+      "Stake: " + askPrice.toFixed(2) + " USD\n" +
+      "Duração: 1 tick\n" +
       "Payout: " + proposal.payout + "\n\n" +
-      "Nenhuma compra foi realizada."
+      "Será enviada apenas UMA compra.\n" +
+      "Sem repetição automática e sem recuperação.\n\n" +
+      "Deseja confirmar?"
     );
+
+    if (!authorized) {
+      console.log(
+        "TradeProJB: Compra cancelada pelo utilizador. Nenhuma compra enviada."
+      );
+      return;
+    }
+
+    // 11. EXECUTAR UMA ÚNICA COMPRA
+    console.log(
+      "TradeProJB: Autorização recebida. A enviar compra única."
+    );
+
+    const result = await buyContractOptions(
+      proposal,
+      askPrice
+    );
+
+    // 12. APRESENTAR O RESULTADO
+    console.log(
+      "TradeProJB: Resultado da primeira compra:",
+      result
+    );
+
+    alert(
+      "COMPRA CONFIRMADA!\n\n" +
+      "Contrato: " + result.contract_id + "\n" +
+      "Preço: " + result.buy_price + " USD\n" +
+      "Acompanhamento: " + result.monitorStatus + "\n\n" +
+      "Não será iniciada outra compra automaticamente."
+    );
+
 
   } catch (error) {
 

@@ -740,6 +740,15 @@ async function connectSelectedAccount() {
   return;
 }
 
+  if (app.connectInProgress) {
+  console.warn(
+    "TradeProJB: Já existe uma tentativa de ligação em curso."
+  );
+  return;
+}
+
+app.connectInProgress = true;
+
   if (button) {
     button.disabled = true;
     button.textContent = "A LIGAR...";
@@ -1420,6 +1429,8 @@ if (samplesElement) {
       button.disabled = false;
       button.textContent = "LIGAR CONTA";
     }
+  } finally {
+    app.connectInProgress = false;
   }
 }
 

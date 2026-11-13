@@ -3041,38 +3041,58 @@ function toggleBot() {
   }
 }
 
+async function startBot() {
 
-function startBot() {
-  // 1. SEGURANÇA: permitir apenas conta DEMO ligada
+  // 1. EVITAR PEDIDOS DUPLICADOS
+  if (bot.proposalRequestInProgress) {
+    console.log("TradeProJB: Já existe um pedido de proposta em curso.");
+    return;
+  }
+
+  // 2. VALIDAR A LIGAÇÃO DEMO
   if (
     !app.wsReady ||
     app.connectedAccountType !== "demo" ||
     !ws ||
     ws.readyState !== WebSocket.OPEN
   ) {
-    alert("Ligue primeiro uma conta DEMO da Deriv através da Options API.");
+    alert("Ligue primeiro uma conta DEMO da Deriv.");
     return;
   }
 
-  // 2. VALIDAR SÍMBOLO E SUBSCRIÇÃO
+  // 3. VALIDAR O SÍMBOLO
   const selectedSymbol = $("cfgSymbol").value;
 
   if (!selectedSymbol || selectedSymbol !== activeTickSymbol) {
-    alert(
-      "O símbolo seleccionado ainda não está sincronizado com a subscrição de ticks."
-    );
+    alert("O símbolo seleccionado não está sincronizado com a subscrição de ticks.");
     return;
   }
 
-  // 3. VALIDAR DADOS RECEBIDOS
+  // 4. VALIDAR OS TICKS
   if (!Array.isArray(ticks) || ticks.length < 20) {
-    alert(
-      "Aguarde até receber pelo menos 20 ticks válidos para iniciar a análise."
-    );
+    alert("Aguarde até receber pelo menos 20 ticks válidos.");
     return;
   }
 
-  // 4. LER E VALIDAR CONFIGURAÇÕES
+  // 5. VALIDAR A PREVISÃO
+  const rawDigit = selectedDigit;
+
+  const digit = (
+    rawDigit === null ||
+    rawDigit === undefined ||
+    (typeof rawDigit === "string" && rawDigit.trim() === "")
+  ) ? NaN : Number(rawDigit);
+
+  if (
+    !Number.isInteger(digit) ||
+    digit < 0 ||
+    digit > 9
+  ) {
+    alert("Seleccione um dígito válido entre 0 e 9.");
+    return;
+  }
+
+  // 6. LER AS CONFIGURAÇÕES
   const initialStake = Number($("cfgStake").value);
   const stopLoss = Number($("cfgSL").value);
   const takeProfit = Number($("cfgTP").value);
@@ -3086,13 +3106,13 @@ function startBot() {
     !Number.isFinite(takeProfit) || takeProfit <= 0 ||
     !Number.isFinite(dailyTarget) || dailyTarget <= 0 ||
     !Number.isInteger(duration) || duration <= 0 ||
-    !durationType
+    !["t", "s", "m", "h", "d"].includes(durationType)
   ) {
-    alert("Verifique os valores das configurações antes de continuar.");
+    alert("Verifique os valores das configurações.");
     return;
   }
 
-  // 5. PREPARAR O ESTADO DO NOVO MOTOR
+  // 7. PREPARAR O MOTOR OPTIONS API
   bot.initialStake = initialStake;
   bot.stopLoss = stopLoss;
   bot.takeProfit = takeProfit;
@@ -3100,7 +3120,7 @@ function startBot() {
   bot.symbol = selectedSymbol;
   bot.duration = duration;
   bot.durationType = durationType;
-  bot.prediction = selectedDigit;
+  bot.prediction = digit;
 
   bot.currentStake = initialStake;
   bot.totalProfit = 0;
@@ -3118,23 +3138,60 @@ function startBot() {
   antiManip.digitHistory = [];
   antiManip.cooldownTrades = 0;
 
-  // 6. PREPARAÇÃO CONCLUÍDA — SEM COMPRAS
-  bot.running = false;
+  // 8. SOLICITAR PROPOSTA — SEM COMPRAR
+  bot.proposalRequestInProgress = true;
 
-  updateUI();
+  try {
 
-  alert(
-    "TradeProJB: configuração validada e novo motor Options API preparado. Nenhuma operação foi executada."
-  );
+    console.log(
+      "[TradeProJB] A iniciar solicitação de proposta Options API."
+    );
 
-  console.log("[TradeProJB] Preparação Options API concluída.", {
-    symbol: bot.symbol,
-    stake: bot.initialStake,
-    duration: bot.duration,
-    durationType: bot.durationType,
-    ticksReceived: ticks.length,
-    accountType: app.connectedAccountType
-  });
+    const proposal = await requestContractProposal();
+
+    // 9. APRESENTAR A PROPOSTA RECEBIDA
+    console.log(
+      "[TradeProJB] PROPOSTA RECEBIDA E VALIDADA:",
+      {
+        proposal_id: proposal.id,
+        symbol: bot.symbol,
+        contract_type: bot.contractType,
+        barrier: bot.prediction,
+        stake: bot.currentStake,
+        ask_price: proposal.ask_price,
+        payout: proposal.payout,
+        longcode: proposal.longcode
+      }
+    );
+
+    alert(
+      "Proposta recebida e validada com sucesso!\n\n" +
+      "Índice: " + bot.symbol + "\n" +
+      "Contrato: " + bot.contractType + "\n" +
+      "Dígito: " + bot.prediction + "\n" +
+      "Stake: " + proposal.ask_price + " " + 
+      (proposal.currency || "") + "\n" +
+      "Payout: " + proposal.payout + "\n\n" +
+      "Nenhuma compra foi realizada."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[TradeProJB] Erro ao solicitar proposta:",
+      error
+    );
+
+    alert(
+      "Não foi possível obter uma proposta:\n" +
+      error.message
+    );
+
+  } finally {
+
+    bot.proposalRequestInProgress = false;
+
+  }
 }
 
 function stopBot() {

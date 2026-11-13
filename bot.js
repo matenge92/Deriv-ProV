@@ -80,6 +80,7 @@ const app = {
   connectedAccountType: null,
   connectedAccountId: null,
   lastPurchaseAttempt: null
+  purchaseInProgress: false
 };
 // CONTAS DERIV
 let derivAccounts = [];

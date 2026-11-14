@@ -3702,7 +3702,7 @@ async function startBot() {
       !Number.isFinite(askPrice) ||
       askPrice <= 0 ||
       Math.abs(askPrice - initialStake) > 0.00000001 ||
-      proposal.currency !== "USD"
+      proposalContexts.get(proposal)?.currency !== "USD"
     ) {
       throw new Error(
         "Preço da proposta inválido ou diferente da stake autorizada."

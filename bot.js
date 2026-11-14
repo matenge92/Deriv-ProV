@@ -1276,15 +1276,17 @@ if (message.msg_type === "proposal_open_contract") {
         );
       }
 
-      // Detectar o encerramento do contrato.
+      // Detectar apenas o encerramento confirmado pelo estado.
       const finished = [
         "won",
         "lost",
         "sold",
         "cancelled"
-      ].includes(String(contract.status).toLowerCase());
+      ].includes(
+        String(contract.status || "").toLowerCase()
+      );
 
-      if (finished || contract.is_sold || contract.is_expired) {
+      if (finished) {
         const subscriptionId = monitor.subscriptionId;
 
         delete activeContractMonitors[contractId];
@@ -2740,19 +2742,14 @@ async function attachPurchaseMonitor(attempt) {
 
         attempt.lastContractUpdate = update;
 
-        const finished =
-          terminalStatuses.includes(
-            String(contract.status || "").toLowerCase()
-          ) ||
-          contract.is_sold === 1 ||
-          contract.is_sold === true ||
-          contract.is_expired === 1 ||
-          contract.is_expired === true;
+        
+        const finished = terminalStatuses.includes(
+          String(contract.status || "").toLowerCase()
+        );
 
         console.log(
           "TradeProJB: Verificação do estado terminal:",
           {
-    
             status: contract.status,
             is_sold: contract.is_sold,
             is_expired: contract.is_expired,

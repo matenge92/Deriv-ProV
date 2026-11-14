@@ -2749,6 +2749,17 @@ async function attachPurchaseMonitor(attempt) {
           contract.is_expired === 1 ||
           contract.is_expired === true;
 
+        console.log(
+          "TradeProJB: Verificação do estado terminal:",
+          {
+    
+            status: contract.status,
+            is_sold: contract.is_sold,
+            is_expired: contract.is_expired,
+            finished: finished
+          }
+        );
+
         if (finished) {
           if (attempt.monitorStatus !== "FINISHED") {
             attempt.finalContract = update;

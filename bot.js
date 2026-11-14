@@ -2758,17 +2758,61 @@ async function attachPurchaseMonitor(attempt) {
         );
 
         if (finished) {
+  
           if (attempt.monitorStatus !== "FINISHED") {
-            attempt.finalContract = update;
-            attempt.monitorStatus = "FINISHED";
-            attempt.monitorFinishedAt = Date.now();
+          attempt.finalContract = update;
+          attempt.monitorStatus = "FINISHED";
+          attempt.monitorFinishedAt = Date.now();
 
-            console.log(
-              "TradeProJB: Acompanhamento concluído:",
-              update
-            );
+    console.log(
+      "TradeProJB: Acompanhamento concluído:",
+      update
+    );
+
+    // Processar o resultado apenas uma vez.
+    if (!attempt.resultProcessed) {
+      const finalProfit = update.profit;
+      const actualStake = attempt.actual_buy_price;
+      const actualContractType = attempt.contract_type;
+
+      if (
+        Number.isFinite(finalProfit) &&
+        Number.isFinite(actualStake) &&
+        actualStake > 0 &&
+        actualContractType
+      ) {
+        attempt.resultProcessed = true;
+
+        processResult(
+          finalProfit,
+          actualStake,
+          actualContractType
+        );
+
+        console.log(
+          "TradeProJB: Resultado integrado na contabilidade:",
+          {
+            contract_id: contractId,
+            contract_type: actualContractType,
+            stake: actualStake,
+            profit: finalProfit
           }
-        } else if (attempt.monitorStatus !== "FINISHED") {
+        );
+
+      } else {
+        console.error(
+          "TradeProJB: Resultado final incompleto. " +
+          "Contabilidade não actualizada.",
+          {
+            profit: finalProfit,
+            stake: actualStake,
+            contract_type: actualContractType
+          }
+        );
+      }
+    }
+  }
+} else if (attempt.monitorStatus !== "FINISHED") {
           attempt.monitorStatus = "ACTIVE";
         }
       }
@@ -3372,7 +3416,7 @@ function recoveryPred(ct) {
   return bot.prediction;
 }
 
-function processResult(profit, stake) {
+function processResult(profit, stake, contractType) {
   bot.totalTrades++;
   bot.totalProfit += profit;
   bot.balance += profit;
@@ -3497,7 +3541,7 @@ function delay(ms) {
     bot.manipulationDetected = true;
     bot.skippedTrades++;
     var skipEntry = {
-      ct: bot.contractType,
+      ct: contractType || bot.contractType,
       stake: 0,
       profit: 0,
       result: "skip",

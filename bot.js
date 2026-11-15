@@ -908,6 +908,16 @@ if (ws) {
         }));
 
         console.log("TradeProJB: Pedido de subscrição de ticks enviado para:", bot.symbol);
+
+        // Subscrever saldo da conta Demo em tempo real
+
+        socket.send(JSON.stringify({
+          balance: 1,
+          subscribe: 1,
+          req_id: 1004
+        }));
+
+console.log("TradeProJB: Pedido de subscrição do saldo enviado.");
         
         // Manter a ligação Options API activa.
 if (optionsPingTimer) {
@@ -1242,6 +1252,31 @@ if (message.error) {
   return;
 }
 
+  // ACTUALIZAR SALDO REAL DA CONTA DEMO
+if (message.msg_type === "balance" && message.balance) {
+
+  const updatedBalance = Number(message.balance.balance);
+
+  if (Number.isFinite(updatedBalance)) {
+
+    bot.balance = updatedBalance;
+
+    const balanceElement = $("headerBalance");
+
+    if (balanceElement) {
+      balanceElement.innerHTML =
+        bot.balance.toFixed(2) + " <small>USD</small>";
+    }
+
+    console.log(
+      "TradeProJB: Saldo da conta actualizado pela Deriv:",
+      bot.balance,
+      message.balance.currency || "USD"
+    );
+  }
+
+  return;
+}
 // 5. ACOMPANHAMENTO DOS CONTRATOS OPTIONS API
 if (message.msg_type === "proposal_open_contract") {
   const contract = message.proposal_open_contract;

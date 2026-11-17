@@ -4057,12 +4057,13 @@ async function startBot() {
       "Stake: " + askPrice.toFixed(2) + " USD\n" +
       "Duração: " + bot.duration + " tick(s)\n" +
       "Payout: " + proposal.payout + "\n\n" +
-      "Será enviada apenas UMA compra.\n" +
-      "Sem repetição automática.\n" +
-      "Sem recuperação.\n\n" +
-      "Confirma a compra?"
+      "A primeira compra será manual.\n" +
+      "As compras seguintes serão automáticas.\n" +
+      "A recuperação estará activa após perdas.\n" +
+      "O bot respeitará os limites de lucro e perda.\n\n" +
+      "Confirma o início do ciclo automático?"
     );
-
+    
     if (!authorized) {
       console.log(
         "TradeProJB: Compra cancelada pelo utilizador."
@@ -4107,7 +4108,7 @@ console.log(
       "Contrato: " + result.contract_id + "\n" +
       "Preço: " + result.buy_price + " USD\n" +
       "Acompanhamento: " + result.monitorStatus + "\n\n" +
-      "Não será iniciada outra compra automaticamente."
+      "A próxima compra será iniciada automaticamente após o fim deste contrato."
     );
       
   } catch (error) {

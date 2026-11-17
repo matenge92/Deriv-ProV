@@ -4031,9 +4031,7 @@ async function startBot() {
         longcode: proposal.longcode
       }
     );
-
-    
-    
+ 
     // 9. VALIDAR O PREÇO DA PROPOSTA
     const askPrice = Number(proposal.ask_price);
 
@@ -4074,12 +4072,11 @@ async function startBot() {
     // ACTIVAR O ESTADO DO BOT APÓS AUTORIZAÇÃO MANUAL
 bot.running = true;
 
-$("btnStart").style.display = "none";
-$("btnStop").style.display = "flex";
-
 document.querySelectorAll(".input-field, .digit-btn").forEach(function (e) {
   e.disabled = true;
 });
+
+$("btnStart").textContent = "⏹ PARAR ROBÔ";
 
 updateUI();
 
@@ -4144,11 +4141,14 @@ console.log(
 
 function stopBot() {
   bot.running = false;
+
   $("btnStart").style.display = "flex";
-  $("btnStop").style.display = "none";
+  $("btnStart").textContent = "▶ INICIAR ROBÔ";
+
   document.querySelectorAll(".input-field, .digit-btn").forEach(function (e) {
     e.disabled = false;
   });
+
   updateUI();
 }
 

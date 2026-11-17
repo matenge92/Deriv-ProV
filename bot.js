@@ -3618,6 +3618,232 @@ function delay(ms) {
     });
 }
 
+
+// ============================================================
+// TRADEPROJB — COORDENADOR DAS COMPRAS AUTOMÁTICAS
+// OPTIONS API — CONTA DEMO
+// ============================================================
+
+async function executeNextTrade() {
+
+  // 1. Impedir execuções simultâneas
+  if (!bot.running || bot.nextTradeInProgress) {
+    return;
+  }
+
+  bot.nextTradeInProgress = true;
+
+  try {
+
+    // 2. Confirmar os limites de operação
+    if (
+      bot.totalProfit <= -bot.stopLoss ||
+      bot.totalProfit >= bot.takeProfit ||
+      bot.totalProfit >= bot.dailyTarget
+    ) {
+      console.log(
+        "TradeProJB: Limite de operação atingido. Ciclo interrompido."
+      );
+
+      stopBot();
+      return;
+    }
+
+    // 3. Confirmar que a conta Demo continua ligada
+    if (
+      !app.wsReady ||
+      app.connectedAccountType !== "demo" ||
+      !ws ||
+      ws.readyState !== WebSocket.OPEN ||
+      String(app.connectedAccountId) !== String(selectedAccountId)
+    ) {
+      console.error(
+        "TradeProJB: Sessão Demo indisponível. Compras automáticas interrompidas."
+      );
+
+      stopBot();
+      return;
+    }
+
+    // 4. Confirmar que a compra anterior terminou
+    const previousAttempt = app.lastPurchaseAttempt;
+
+    if (
+      !previousAttempt ||
+      previousAttempt.status !== "CONFIRMED" ||
+      previousAttempt.monitorStatus !== "FINISHED" ||
+      previousAttempt.resultProcessed !== true
+    ) {
+      console.error(
+        "TradeProJB: Compra anterior ainda não foi totalmente resolvida. " +
+        "Nova compra bloqueada.",
+        previousAttempt
+      );
+
+      stopBot();
+      return;
+    }
+
+    // 5. Aplicar o filtro Anti-Manipulation
+    while (bot.running) {
+
+      const manipCheck = antiManip.shouldSkip();
+
+      if (!manipCheck.skip) {
+        bot.manipulationDetected = false;
+        updateUI();
+        break;
+      }
+
+      bot.manipulationDetected = true;
+      bot.skippedTrades++;
+
+      const skipEntry = {
+        ct: bot.contractType,
+        stake: 0,
+        profit: 0,
+        result: "skip",
+        reason: manipCheck.reason
+      };
+
+      bot.history.unshift(skipEntry);
+      addHistoryItem(skipEntry);
+      updateUI();
+
+      console.warn(
+        "TradeProJB: Próxima compra adiada pelo filtro Anti-Manipulation:",
+        manipCheck.reason
+      );
+
+      await delay(2000);
+    }
+
+    // 6. Respeitar uma eventual ordem de paragem
+    if (!bot.running) {
+      return;
+    }
+
+    // 7. Confirmar novamente os limites
+    if (
+      bot.totalProfit <= -bot.stopLoss ||
+      bot.totalProfit >= bot.takeProfit ||
+      bot.totalProfit >= bot.dailyTarget
+    ) {
+      stopBot();
+      return;
+    }
+
+    // 8. Solicitar uma nova proposta Options API
+    console.log(
+      "TradeProJB: A preparar próxima operação automática:",
+      {
+        contract_type: bot.contractType,
+        stake: bot.currentStake,
+        recovery: bot.isRecovery,
+        symbol: bot.symbol
+      }
+    );
+
+    bot.proposalRequestInProgress = true;
+
+    let proposal;
+
+    try {
+      proposal = await requestContractProposal();
+    } finally {
+      bot.proposalRequestInProgress = false;
+    }
+
+    // 9. Não comprar se o utilizador tiver parado o bot
+    if (!bot.running) {
+      console.log(
+        "TradeProJB: Compra automática cancelada antes do envio."
+      );
+      return;
+    }
+
+    // 10. Validar novamente a sessão Demo
+    if (
+      !app.wsReady ||
+      app.connectedAccountType !== "demo" ||
+      !ws ||
+      ws.readyState !== WebSocket.OPEN ||
+      String(app.connectedAccountId) !== String(selectedAccountId)
+    ) {
+      throw new Error(
+        "A sessão Demo mudou antes da compra automática."
+      );
+    }
+
+    // 11. Validar o preço da proposta
+    const askPrice = Number(proposal.ask_price);
+
+    if (
+      !Number.isFinite(askPrice) ||
+      askPrice <= 0 ||
+      Math.abs(askPrice - Number(bot.currentStake)) > 0.00000001 ||
+      proposalContexts.get(proposal)?.currency !== "USD"
+    ) {
+      throw new Error(
+        "A proposta automática não corresponde à stake ou moeda autorizada."
+      );
+    }
+
+    // 12. Enviar a compra sem confirmação manual
+    console.log(
+      "TradeProJB: A enviar compra automática:",
+      {
+        proposal_id: proposal.id,
+        contract_type: bot.contractType,
+        stake: askPrice,
+        recovery: bot.isRecovery
+      }
+    );
+
+    const result = await buyContractOptions(
+      proposal,
+      askPrice
+    );
+
+    // 13. Confirmar que a compra foi acompanhada
+    if (
+      !result ||
+      !result.contract_id ||
+      !result.monitorStarted ||
+      !["ACTIVE", "FINISHED"].includes(result.monitorStatus)
+    ) {
+      throw new Error(
+        "Compra confirmada, mas o acompanhamento não está activo. " +
+        "Ciclo automático interrompido."
+      );
+    }
+
+    console.log(
+      "TradeProJB: Compra automática confirmada e acompanhada:",
+      result
+    );
+
+  } catch (error) {
+
+    console.error(
+      "TradeProJB: Ciclo automático interrompido:",
+      error
+    );
+
+    stopBot();
+
+    alert(
+      "O ciclo automático foi interrompido por segurança:\n\n" +
+      error.message
+    );
+
+  } finally {
+
+    bot.proposalRequestInProgress = false;
+    bot.nextTradeInProgress = false;
+  }
+}
+
 function toggleBot() {
   if (bot.running) {
     stopBot();

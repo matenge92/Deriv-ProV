@@ -2834,6 +2834,32 @@ async function attachPurchaseMonitor(attempt) {
           }
         );
 
+        // INICIAR A PRÓXIMA OPERAÇÃO APENAS UMA VEZ
+if (
+  bot.running &&
+  app.lastPurchaseAttempt === attempt &&
+  !attempt.nextTradeStarted
+) {
+  attempt.nextTradeStarted = true;
+
+  console.log(
+    "TradeProJB: Resultado processado. Preparar próxima compra automática."
+  );
+
+  // Pequeno intervalo para libertar o ciclo da compra anterior.
+  delay(100).then(function () {
+    if (bot.running) {
+      return executeNextTrade();
+    }
+  }).catch(function (error) {
+    console.error(
+      "TradeProJB: Erro ao iniciar a próxima operação:",
+      error
+    );
+    stopBot();
+  });
+}
+
       } else {
         console.error(
           "TradeProJB: Resultado final incompleto. " +

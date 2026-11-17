@@ -4044,6 +4044,22 @@ async function startBot() {
       return;
     }
 
+    // ACTIVAR O ESTADO DO BOT APÓS AUTORIZAÇÃO MANUAL
+bot.running = true;
+
+$("btnStart").style.display = "none";
+$("btnStop").style.display = "flex";
+
+document.querySelectorAll(".input-field, .digit-btn").forEach(function (e) {
+  e.disabled = true;
+});
+
+updateUI();
+
+console.log(
+  "TradeProJB: Bot activado. Primeira compra autorizada manualmente."
+);
+
     // 11. ENVIAR UMA ÚNICA COMPRA
     console.log(
       "TradeProJB: A enviar compra autorizada:",
@@ -4074,6 +4090,8 @@ async function startBot() {
       "[TradeProJB] Erro durante a proposta ou compra:",
       error
     );
+
+    stopBot();
 
     if (error.code === "BUY_UNKNOWN") {
       alert(

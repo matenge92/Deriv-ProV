@@ -4154,6 +4154,7 @@ console.log(
         "NÃO inicie outra compra antes de verificar este contrato na Deriv."
       );
   } else {
+    else {
     alert(
         "Não foi possível concluir a operação:\n" +
         error.message

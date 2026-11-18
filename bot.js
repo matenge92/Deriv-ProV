@@ -3757,6 +3757,7 @@ async function executeNextTrade() {
     ) {
       stopBot();
       return;
+    
     }
 
     // 8. Solicitar uma nova proposta Options API
@@ -4126,6 +4127,7 @@ console.log(
       "Acompanhamento: " + result.monitorStatus + "\n\n" +
       "A próxima compra será iniciada automaticamente após o fim deste contrato."
     );    
+  
   } catch (error) {
 
     console.error(
@@ -4142,7 +4144,7 @@ console.log(
         "Não clique novamente em INICIAR ROBÔ.\n" +
         "Verifique o estado da conta e do contrato."
       );
-    }
+
     } else if (
       error.code === "BUY_CONFIRMED_MONITOR_FAILED"
     ) {
@@ -4153,18 +4155,21 @@ console.log(
         "O robô foi parado por segurança.\n" +
         "NÃO inicie outra compra antes de verificar este contrato na Deriv."
       );
-  } else {
-    else {
-    alert(
+
+    } else {
+      alert(
         "Não foi possível concluir a operação:\n" +
         error.message
       );
     }
+
   } finally {
 
     bot.proposalRequestInProgress = false;
+
   }
 }
+
 
 function stopBot() {
   bot.running = false;

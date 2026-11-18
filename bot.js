@@ -4090,24 +4090,42 @@ console.log(
       proposal.id
     );
 
-    const result = await buyContractOptions(
-      proposal,
-      askPrice
-    );
+    
+const result = await buyContractOptions(
+  proposal,
+  askPrice
+);
 
-    console.log(
-      "TradeProJB: Resultado da compra:",
-      result
-    );
+// VALIDAR A CONFIRMAÇÃO E O ACOMPANHAMENTO
+if (
+  !result ||
+  !result.contract_id ||
+  result.monitorStarted !== true ||
+  !["ACTIVE", "FINISHED"].includes(result.monitorStatus)
+) {
+  const monitorError = new Error(
+    "A compra foi confirmada, mas o acompanhamento do contrato não ficou activo. " +
+    "O ciclo automático foi interrompido por segurança."
+  );
 
+  monitorError.code = "BUY_CONFIRMED_MONITOR_FAILED";
+  monitorError.contract_id = result?.contract_id || null;
+  monitorError.monitorStatus = result?.monitorStatus || "UNKNOWN";
+
+  throw monitorError;
+}
+
+console.log(
+  "TradeProJB: Resultado da compra:",
+  result
+);
     alert(
       "COMPRA CONFIRMADA!\n\n" +
       "Contrato: " + result.contract_id + "\n" +
       "Preço: " + result.buy_price + " USD\n" +
       "Acompanhamento: " + result.monitorStatus + "\n\n" +
       "A próxima compra será iniciada automaticamente após o fim deste contrato."
-    );
-      
+    );    
   } catch (error) {
 
     console.error(
@@ -4124,18 +4142,26 @@ console.log(
         "Não clique novamente em INICIAR ROBÔ.\n" +
         "Verifique o estado da conta e do contrato."
       );
-
-    } else {
+    }
+    } else if (
+      error.code === "BUY_CONFIRMED_MONITOR_FAILED"
+    ) {
       alert(
+        "COMPRA CONFIRMADA — ACOMPANHAMENTO INDISPONÍVEL!\n\n" +
+        "Contrato: " + (error.contract_id || "Verificar na conta Demo") + "\n" +
+        "Estado do acompanhamento: " + error.monitorStatus + "\n\n" +
+        "O robô foi parado por segurança.\n" +
+        "NÃO inicie outra compra antes de verificar este contrato na Deriv."
+      );
+  } else {
+    alert(
         "Não foi possível concluir a operação:\n" +
         error.message
       );
     }
-
   } finally {
 
     bot.proposalRequestInProgress = false;
-
   }
 }
 

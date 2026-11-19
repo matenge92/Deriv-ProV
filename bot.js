@@ -4097,9 +4097,19 @@ const result = await buyContractOptions(
   askPrice
 );
 
+    // 13-A. PROTEGER CONTRA RESULTADO DE COMPRA DESCONHECIDO
+  if (!result) {
+    const resultError = new Error(
+      "Não foi recebido um resultado válido da função de compra. " +
+      "O estado da operação deve ser verificado antes de repetir."
+    );
+
+    resultError.code = "BUY_UNKNOWN";
+    throw resultError;
+  }
+
 // VALIDAR A CONFIRMAÇÃO E O ACOMPANHAMENTO
 if (
-  !result ||
   !result.contract_id ||
   result.monitorStarted !== true ||
   !["ACTIVE", "FINISHED"].includes(result.monitorStatus)

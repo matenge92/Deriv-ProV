@@ -3974,23 +3974,21 @@ if (shouldBlockRestart) {
     return;
   }
 
-    // Condições fixas da primeira compra de demonstração.
-  if (
-    selectedSymbol !== "R_10" ||
-    Math.abs(initialStake - 0.35) > 0.00000001 ||
-    duration !== 1 ||
-    durationType !== "t"
-  ) {
-    alert(
-      "Primeira operação bloqueada.\n\n" +
-      "Configuração exigida:\n" +
-      "Índice: R_10\n" +
-      "Stake: 0.35 USD\n" +
-      "Duração: 1 tick"
-    );
-    return;
-  }
-
+    // Condições fixas da primeira fase de testes em Demo.
+if (
+  Math.abs(initialStake - 0.35) > 0.00000001 ||
+  duration !== 1 ||
+  durationType !== "t"
+) {
+  alert(
+    "Primeira operação bloqueada.\n\n" +
+    "Configuração exigida:\n" +
+    "Stake: 0.35 USD\n" +
+    "Duração: 1 tick"
+  );
+  return;
+}
+  
   // 7. PREPARAR O MOTOR OPTIONS API
   bot.initialStake = initialStake;
   bot.stopLoss = stopLoss;

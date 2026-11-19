@@ -3264,8 +3264,12 @@ function switchTab(t) {
   $("tabHistory").className =
     "panel-tab" + (t === "history" ? " active" : "");
 
+  $("tabMonitor").className =
+    "panel-tab" + (t === "monitor" ? " active" : "");
+
   $("panelControls").classList.toggle("hidden", t !== "controls");
   $("panelHistory").classList.toggle("hidden", t !== "history");
+  $("panelMonitor").classList.toggle("hidden", t !== "monitor");
 }
 
 // ==================== UI UPDATE ====================

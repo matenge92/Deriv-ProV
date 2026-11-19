@@ -3899,19 +3899,29 @@ async function startBot() {
   }
 
     // Bloquear uma nova tentativa enquanto a primeira não estiver resolvida.
-  if (
-    app.lastPurchaseAttempt &&
-    ["PENDING", "UNKNOWN", "CONFIRMED"].includes(
-      app.lastPurchaseAttempt.status
-    )
-  ) {
-    alert(
-      "Já existe uma tentativa de compra registada. " +
-      "Verifique o seu estado antes de continuar."
-    );
-    return;
-  }
+  // Bloquear nova tentativa enquanto a compra anterior não estiver resolvida.
+const lastAttempt = app.lastPurchaseAttempt;
 
+const shouldBlockRestart =
+  lastAttempt &&
+  (
+    ["PENDING", "UNKNOWN"].includes(lastAttempt.status) ||
+    (
+      lastAttempt.status === "CONFIRMED" &&
+      !(
+        lastAttempt.monitorStatus === "FINISHED" &&
+        lastAttempt.resultProcessed === true
+      )
+    )
+  );
+
+if (shouldBlockRestart) {
+  alert(
+    "Já existe uma tentativa de compra não resolvida. " +
+    "Verifique o estado da compra antes de continuar."
+  );
+  return;
+}
   // 3. VALIDAR O SÍMBOLO
   const selectedSymbol = $("cfgSymbol").value;
 

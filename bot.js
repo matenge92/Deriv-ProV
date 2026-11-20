@@ -19,6 +19,69 @@ let pendingBuyReconciliations = {};
 let activeContractMonitors = {};
 // C1 — Contexto privado das propostas Options API
 const proposalContexts = new WeakMap();
+// ============================================================
+// TRADEPROJB — MONITOR DE ENTRADAS (OBSERVADOR)
+// ============================================================
+
+const entryMonitorState = {
+  proposalPending: 0,
+  buyPending: 0,
+  started: 0,
+  activeContracts: new Set(),
+  completed: 0,
+  totalEntries: 0,
+  lastResult: null
+};
+
+function renderEntryMonitor() {
+  const proposalLed = $("ledProposal");
+  const buyLed = $("ledBuy");
+  const startedLed = $("ledStarted");
+  const activeLed = $("ledActive");
+  const resultLed = $("ledResult");
+
+  if (!proposalLed || !buyLed || !startedLed ||
+      !activeLed || !resultLed) {
+    return;
+  }
+
+  proposalLed.classList.toggle(
+    "is-on",
+    entryMonitorState.proposalPending > 0
+  );
+
+  buyLed.classList.toggle(
+    "is-on",
+    entryMonitorState.buyPending > 0
+  );
+
+  startedLed.classList.toggle(
+    "is-on",
+    entryMonitorState.started > 0
+  );
+
+  activeLed.classList.toggle(
+    "is-on",
+    entryMonitorState.activeContracts.size > 0
+  );
+
+  const totalEl = $("monitorTotalEntries");
+  const activeEl = $("monitorInProgress");
+  const completedEl = $("monitorCompleted");
+
+  if (totalEl) {
+    totalEl.textContent = entryMonitorState.totalEntries;
+  }
+
+  if (activeEl) {
+    activeEl.textContent =
+      entryMonitorState.activeContracts.size;
+  }
+
+  if (completedEl) {
+    completedEl.textContent = entryMonitorState.completed;
+  }
+}
 
 let ticks = [],
   selectedDigit = 0;

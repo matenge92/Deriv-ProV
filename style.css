@@ -1874,44 +1874,68 @@ select:focus {
                box-shadow 0.2s ease;
 }
 
-/* PROPOSAL — AZUL */
+/* PROPOSAL — AZUL NEON */
 .led-proposal.is-on {
-    background: #3498ff;
+    background: #00aaff;
     opacity: 1;
-    box-shadow: 0 0 7px rgba(52, 152, 255, 0.8);
+    box-shadow:
+        0 0 4px #00aaff,
+        0 0 10px #0088ff,
+        0 0 20px #0066ff,
+        0 0 35px rgba(0, 102, 255, 0.85);
 }
 
-/* BUY — LARANJA */
+/* BUY — LARANJA NEON */
 .led-buy.is-on {
-    background: #ff9800;
+    background: #ffb000;
     opacity: 1;
-    box-shadow: 0 0 7px rgba(255, 152, 0, 0.8);
+    box-shadow:
+        0 0 4px #ffb000,
+        0 0 10px #ff9900,
+        0 0 20px #ff7700,
+        0 0 35px rgba(255, 119, 0, 0.85);
 }
 
-/* STARTED — ROXO */
+/* STARTED — ROXO NEON */
 .led-started.is-on {
-    background: #b266ff;
+    background: #c060ff;
     opacity: 1;
-    box-shadow: 0 0 7px rgba(178, 102, 255, 0.8);
+    box-shadow:
+        0 0 4px #c060ff,
+        0 0 10px #a040ff,
+        0 0 20px #8800ff,
+        0 0 35px rgba(136, 0, 255, 0.85);
 }
 
-/* ACTIVE — CIANO */
+/* ACTIVE — CIANO NEON */
 .led-active.is-on {
-    background: #00e5ff;
+    background: #00eaff;
     opacity: 1;
-    box-shadow: 0 0 7px rgba(0, 229, 255, 0.8);
+    box-shadow:
+        0 0 4px #00eaff,
+        0 0 10px #00ccff,
+        0 0 20px #0099ff,
+        0 0 35px rgba(0, 153, 255, 0.85);
 }
 
-/* RESULT — VERDE (LUCRO) */
-.led-result.is-on {
-    background: #00e676;
+/* RESULT — VERDE NEON */
+.led-result.is-on:not(.is-loss) {
+    background: #39ff14;
     opacity: 1;
-    box-shadow: 0 0 7px rgba(0, 230, 118, 0.8);
+    box-shadow:
+        0 0 4px #39ff14,
+        0 0 10px #39ff14,
+        0 0 20px #00ff00,
+        0 0 35px rgba(0, 255, 0, 0.85);
 }
 
-/* RESULT — VERMELHO (PERDA) */
+/* RESULT — VERMELHO NEON */
 .led-result.is-loss {
-    background: #ff3d57;
+    background: #ff1744;
     opacity: 1;
-    box-shadow: 0 0 7px rgba(255, 61, 87, 0.8);
+    box-shadow:
+        0 0 4px #ff1744,
+        0 0 10px #ff1744,
+        0 0 20px #ff0033,
+        0 0 35px rgba(255, 0, 51, 0.85);
 }

@@ -83,6 +83,32 @@ function renderEntryMonitor() {
   }
 }
 
+// ============================================================
+// PROPOSAL — CONTROLO DE ESTADO DO LED
+// ============================================================
+
+function startProposalMonitor(pending) {
+  if (pending.proposalMonitorActive) return;
+
+  pending.proposalMonitorActive = true;
+  entryMonitorState.proposalPending++;
+
+  renderEntryMonitor();
+}
+
+function finishProposalMonitor(pending) {
+  if (!pending || !pending.proposalMonitorActive) return;
+
+  pending.proposalMonitorActive = false;
+
+  entryMonitorState.proposalPending = Math.max(
+    0,
+    entryMonitorState.proposalPending - 1
+  );
+
+  renderEntryMonitor();
+}
+
 let ticks = [],
   selectedDigit = 0;
 
@@ -1030,6 +1056,7 @@ const optionsPending = requestKey
 if (optionsPending) {
   delete pendingOptionsRequests[requestKey];
   clearTimeout(optionsPending.timer);
+  finishProposalMonitor(optionsPending);
 
   const reconciliation = optionsPending.isBuy
     ? pendingBuyReconciliations[requestKey]
@@ -1672,6 +1699,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
     }
 
     const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
+    const isProposal = Object.prototype.hasOwnProperty.call(payload, "proposal");
     const requestId = ++optionsRequestId;
     const requestKey = String(requestId);
 
@@ -1707,6 +1735,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
       if (pending) {
         delete pendingOptionsRequests[requestKey];
+        finishProposalMonitor(pending);
 
         const timeoutError = new Error(
           pending.isBuy && pending.sent
@@ -1751,6 +1780,9 @@ function sendOptionsRequest(payload, timeout = 15000) {
       const pendingRequest = pendingOptionsRequests[requestKey];
 
       socket.send(message);
+      if (isProposal) {
+        startProposalMonitor(pendingRequest);
+      }
 
       // Marcar como enviada depois de socket.send aceitar a mensagem.
       pendingRequest.sent = isBuy;

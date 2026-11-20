@@ -1853,3 +1853,9 @@ select:focus {
         font-size: 5px !important;
     }
 }
+/* ===== LARGURA DO MONITOR ===== */
+.live-monitor {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}

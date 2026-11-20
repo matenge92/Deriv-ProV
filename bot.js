@@ -1700,6 +1700,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
     const isBuy = Object.prototype.hasOwnProperty.call(payload, "buy");
     const isProposal = Object.prototype.hasOwnProperty.call(payload, "proposal");
+    
     const requestId = ++optionsRequestId;
     const requestKey = String(requestId);
 

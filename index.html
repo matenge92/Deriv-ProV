@@ -269,6 +269,83 @@
 
         </div>
 
+        
+        <!-- ================= LIVE ENTRY MONITOR ================= -->
+
+        <section id="liveMonitor" class="live-monitor">
+
+          <div class="live-monitor-header">
+
+            <div class="live-monitor-title">
+              <span class="monitor-title-dot"></span>
+              <h3>MONITOR DE ENTRADAS</h3>
+            </div>
+
+            <span id="monitorLiveStatus" class="monitor-live-status">
+              AGUARDANDO
+            </span>
+
+          </div>
+
+
+          <!-- FIVE STATUS LEDS -->
+
+          <div class="monitor-led-bar">
+
+            <div class="monitor-led-item" data-phase="proposal">
+              <span id="ledProposal" class="monitor-led led-proposal"></span>
+              <span class="monitor-led-label">PROPOSAL</span>
+            </div>
+
+            <div class="monitor-led-item" data-phase="buy">
+              <span id="ledBuy" class="monitor-led led-buy"></span>
+              <span class="monitor-led-label">BUY</span>
+            </div>
+
+            <div class="monitor-led-item" data-phase="started">
+              <span id="ledStarted" class="monitor-led led-started"></span>
+              <span class="monitor-led-label">STARTED</span>
+            </div>
+
+            <div class="monitor-led-item" data-phase="active">
+              <span id="ledActive" class="monitor-led led-active"></span>
+              <span class="monitor-led-label">ACTIVE</span>
+            </div>
+
+            <div class="monitor-led-item" data-phase="result">
+              <span id="ledResult" class="monitor-led led-result"></span>
+              <span class="monitor-led-label">RESULT</span>
+            </div>
+
+          </div>
+
+
+          <!-- MONITOR COUNTERS -->
+
+          <div class="monitor-summary">
+
+            <div class="monitor-summary-item">
+              <span>ENTRADAS ACOMPANHADAS</span>
+              <strong id="monitorTotalEntries">0</strong>
+            </div>
+
+            <div class="monitor-summary-item">
+              <span>EM CURSO</span>
+              <strong id="monitorInProgress">0</strong>
+            </div>
+
+            <div class="monitor-summary-item">
+              <span>RESULTADOS CONCLUÍDOS</span>
+              <strong id="monitorCompleted">0</strong>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================= END LIVE ENTRY MONITOR ================= -->
+
+
 
         <!-- CHART LEGEND -->
 

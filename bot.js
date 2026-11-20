@@ -1798,6 +1798,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
       clearTimeout(timer);
       delete pendingOptionsRequests[requestKey];
+      finishProposalMonitor(pendingRequest);
 
       // O envio falhou antes de ser aceite pelo socket.
       if (isBuy) {

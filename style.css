@@ -1786,3 +1786,70 @@ select:focus {
         font-size: 5px !important;
     }
 }
+/* ===== TRADEPROJB — MONITOR MINI ===== */
+
+.live-monitor {
+    margin: 4px 0 !important;
+    padding: 2px 5px !important;
+    min-height: 0 !important;
+    border-radius: 5px !important;
+}
+
+.live-monitor-header,
+.monitor-summary {
+    display: none !important;
+}
+
+.monitor-led-bar {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 1px 0 !important;
+    gap: 2px !important;
+}
+
+.monitor-led-item {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    padding: 2px 1px !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.monitor-led {
+    width: 6px !important;
+    height: 6px !important;
+    min-width: 6px !important;
+}
+
+.monitor-led-label {
+    font-size: 6px !important;
+    letter-spacing: 0 !important;
+    white-space: nowrap !important;
+}
+
+/* Telemóvel */
+@media (max-width: 420px) {
+    .live-monitor {
+        padding: 1px 3px !important;
+        margin: 3px 0 !important;
+    }
+
+    .monitor-led-item {
+        gap: 2px !important;
+    }
+
+    .monitor-led {
+        width: 5px !important;
+        height: 5px !important;
+        min-width: 5px !important;
+    }
+
+    .monitor-led-label {
+        font-size: 5px !important;
+    }
+}

@@ -1651,3 +1651,71 @@ select:focus {
 .settings-modal {
   flex-shrink: 0;
 }
+
+/* ===== MONITOR ULTRA COMPACTO ===== */
+
+.live-monitor {
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+}
+
+.live-monitor-header {
+  margin-bottom: 5px;
+}
+
+.live-monitor-title {
+  gap: 5px;
+}
+
+.live-monitor-title h3 {
+  font-size: 9px;
+}
+
+.monitor-title-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.monitor-live-status {
+  padding: 2px 6px;
+  font-size: 7px;
+}
+
+.monitor-led-bar {
+  padding: 3px 2px;
+  border-radius: 7px;
+}
+
+.monitor-led-item {
+  gap: 3px;
+  padding: 3px 1px;
+}
+
+.monitor-led {
+  width: 8px;
+  height: 8px;
+}
+
+.monitor-led-label {
+  font-size: 7px;
+  letter-spacing: 0;
+}
+
+.monitor-summary {
+  margin-top: 5px;
+  border-radius: 6px;
+}
+
+.monitor-summary-item {
+  gap: 2px;
+  padding: 4px 2px;
+}
+
+.monitor-summary-item span {
+  font-size: 6px;
+}
+
+.monitor-summary-item strong {
+  font-size: 12px;
+}

@@ -603,6 +603,7 @@ select:focus {
   font-size: 15px;
 }
 
+
 /* ================= LIVE ENTRY MONITOR ================= */
 
 .live-monitor {
@@ -857,7 +858,6 @@ select:focus {
   font-weight: 800;
 }
 /* ================= END LIVE ENTRY MONITOR ================= */
-
 
 /* ================= CHART LEGEND ================= */
 

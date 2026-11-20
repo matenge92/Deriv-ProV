@@ -1,4 +1,3 @@
-
 /* =========================================================
    TRADEPROJB — STYLE.CSS
    Dashboard Deriv | Digit Differs
@@ -1858,4 +1857,61 @@ select:focus {
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+}
+/* ============================================================
+   TRADEPROJB — MONITOR DE ENTRADAS | LEDS
+   ============================================================ */
+
+.monitor-led {
+    width: 9px;
+    height: 9px;
+    min-width: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    background: #303744;
+    opacity: 0.45;
+    transition: background 0.2s ease, opacity 0.2s ease,
+               box-shadow 0.2s ease;
+}
+
+/* PROPOSAL — AZUL */
+.led-proposal.is-on {
+    background: #3498ff;
+    opacity: 1;
+    box-shadow: 0 0 7px rgba(52, 152, 255, 0.8);
+}
+
+/* BUY — LARANJA */
+.led-buy.is-on {
+    background: #ff9800;
+    opacity: 1;
+    box-shadow: 0 0 7px rgba(255, 152, 0, 0.8);
+}
+
+/* STARTED — ROXO */
+.led-started.is-on {
+    background: #b266ff;
+    opacity: 1;
+    box-shadow: 0 0 7px rgba(178, 102, 255, 0.8);
+}
+
+/* ACTIVE — CIANO */
+.led-active.is-on {
+    background: #00e5ff;
+    opacity: 1;
+    box-shadow: 0 0 7px rgba(0, 229, 255, 0.8);
+}
+
+/* RESULT — VERDE (LUCRO) */
+.led-result.is-on {
+    background: #00e676;
+    opacity: 1;
+    box-shadow: 0 0 7px rgba(0, 230, 118, 0.8);
+}
+
+/* RESULT — VERMELHO (PERDA) */
+.led-result.is-loss {
+    background: #ff3d57;
+    opacity: 1;
+    box-shadow: 0 0 7px rgba(255, 61, 87, 0.8);
 }

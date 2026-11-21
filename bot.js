@@ -2833,6 +2833,10 @@ async function startContractMonitor(contractId, onUpdate) {
   };
 
   activeContractMonitors[id] = monitor;
+  
+  entryMonitorState.activeContracts.add(id);
+  entryMonitorState.totalEntries++;
+  renderEntryMonitor();
 
   console.log(
     "TradeProJB: Acompanhamento iniciado:",
@@ -2865,6 +2869,9 @@ async function stopContractMonitor(contractId) {
   }
 
   delete activeContractMonitors[id];
+
+  entryMonitorState.activeContracts.delete(id);
+  renderEntryMonitor();
 
   if (monitor.subscriptionId) {
     await sendOptionsRequest({

@@ -3048,13 +3048,24 @@ async function attachPurchaseMonitor(attempt) {
           }
         );
 
+    // LED RESULT — sinal momentâneo de resultado contabilizado.
+        entryMonitorState.completed++;
+        entryMonitorState.lastResult = finalProfit >= 0 ? "win" : "loss";
+        entryMonitorState.resultPulse = true;
+        renderEntryMonitor();
+
+        setTimeout(function () {
+        entryMonitorState.resultPulse = false;
+        renderEntryMonitor();
+        }, 1200);
+
         // INICIAR A PRÓXIMA OPERAÇÃO APENAS UMA VEZ
-if (
-  bot.running &&
-  app.lastPurchaseAttempt === attempt &&
-  !attempt.nextTradeStarted
-) {
-  attempt.nextTradeStarted = true;
+        if (
+          bot.running &&
+          app.lastPurchaseAttempt === attempt &&
+          !attempt.nextTradeStarted
+          ) {
+          attempt.nextTradeStarted = true;
 
   console.log(
     "TradeProJB: Resultado processado. Preparar próxima compra automática."

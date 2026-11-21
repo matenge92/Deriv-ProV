@@ -70,6 +70,12 @@ function renderEntryMonitor() {
   entryMonitorState.resultPulse
   );
 
+  resultLed.classList.toggle(
+  "is-loss",
+  entryMonitorState.resultPulse &&
+  entryMonitorState.lastResult === "loss"
+  );
+
   const totalEl = $("monitorTotalEntries");
   const activeEl = $("monitorInProgress");
   const completedEl = $("monitorCompleted");

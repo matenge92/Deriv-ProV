@@ -31,7 +31,7 @@ const entryMonitorState = {
   completed: 0,
   totalEntries: 0,
   lastResult: null
-  resultPulse: false
+  resultPulse: false,
 };
 
 function renderEntryMonitor() {

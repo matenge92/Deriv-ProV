@@ -30,8 +30,8 @@ const entryMonitorState = {
   activeContracts: new Set(),
   completed: 0,
   totalEntries: 0,
-  lastResult: null
-  resultPulse: false,
+  lastResult: null,
+  resultPulse: false
 };
 
 function renderEntryMonitor() {

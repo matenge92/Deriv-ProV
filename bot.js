@@ -22,7 +22,6 @@ const proposalContexts = new WeakMap();
 // ============================================================
 // TRADEPROJB — MONITOR DE ENTRADAS (OBSERVADOR)
 // ============================================================
-
 const entryMonitorState = {
   proposalPending: 0,
   buyPending: 0,

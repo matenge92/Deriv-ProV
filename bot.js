@@ -66,6 +66,11 @@ function renderEntryMonitor() {
     entryMonitorState.activeContracts.size > 0
   );
 
+  resultLed.classList.toggle(
+  "is-on",
+  entryMonitorState.resultPulse
+  );
+
   const totalEl = $("monitorTotalEntries");
   const activeEl = $("monitorInProgress");
   const completedEl = $("monitorCompleted");

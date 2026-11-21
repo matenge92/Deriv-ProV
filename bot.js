@@ -31,6 +31,7 @@ const entryMonitorState = {
   completed: 0,
   totalEntries: 0,
   lastResult: null
+  resultPulse: false
 };
 
 function renderEntryMonitor() {
@@ -3688,6 +3689,7 @@ function recoveryPred(ct) {
   if (ct === "DIGITUNDER") return 5;
   return bot.prediction;
 }
+
 
 function processResult(profit, stake, contractType) {
   bot.totalTrades++;

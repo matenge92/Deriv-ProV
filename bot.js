@@ -83,6 +83,37 @@ function renderEntryMonitor() {
   }
 }
 
+
+function startStartedMonitor(attempt) {
+  if (!attempt) {
+    console.warn("TradeProJB: Tentativa inválida para iniciar monitor.");
+    return;
+  }
+
+  if (attempt.startedMonitorCounted === true) {
+    return;
+  }
+
+  attempt.startedMonitorCounted = true;
+  entryMonitorState.started++;
+  renderEntryMonitor();
+}
+
+function finishStartedMonitor(attempt) {
+  if (!attempt || attempt.startedMonitorCounted !== true) {
+    return;
+  }
+
+  attempt.startedMonitorCounted = false;
+  entryMonitorState.started = Math.max(
+    0,
+    entryMonitorState.started - 1
+  );
+
+  renderEntryMonitor();
+}
+
+
 // ============================================================
 // PROPOSAL — CONTROLO DE ESTADO DO LED
 // ============================================================
@@ -129,6 +160,31 @@ function finishBuyMonitor(pending) {
   entryMonitorState.buyPending = Math.max(
     0,
     entryMonitorState.buyPending - 1
+  );
+
+  renderEntryMonitor();
+}
+// ============================================================
+// STARTED — CONTROLO DE ESTADO DO LED
+// ============================================================
+
+function startStartedMonitor(pending) {
+  if (!pending || pending.startedMonitorActive) return;
+
+  pending.startedMonitorActive = true;
+  entryMonitorState.started++;
+
+  renderEntryMonitor();
+}
+
+function finishStartedMonitor(pending) {
+  if (!pending || !pending.startedMonitorActive) return;
+
+  pending.startedMonitorActive = false;
+
+  entryMonitorState.started = Math.max(
+    0,
+    entryMonitorState.started - 1
   );
 
   renderEntryMonitor();
@@ -1208,6 +1264,8 @@ if (optionsPending) {
 if (!reconciliation.monitorAttachInProgress) {
   reconciliation.monitorAttachInProgress = true;
 
+  startStartedMonitor(attempt);
+
   Promise.resolve()
     .then(function () {
       return attachPurchaseMonitor(attempt);
@@ -1215,6 +1273,8 @@ if (!reconciliation.monitorAttachInProgress) {
     .then(function (monitorStarted) {
 
       reconciliation.monitorAttachInProgress = false;
+      
+      finishStartedMonitor(attempt);
 
       if (
         monitorStarted &&
@@ -1245,6 +1305,8 @@ if (!reconciliation.monitorAttachInProgress) {
     .catch(function (error) {
 
       reconciliation.monitorAttachInProgress = false;
+
+      finishStartedMonitor(attempt);
 
       console.error(
         "TradeProJB: Falha ao iniciar acompanhamento da compra tardia. " +
@@ -2688,9 +2750,17 @@ const result = {
   );
 
   // 7. INICIAR O ACOMPANHAMENTO DO CONTRATO
-  const monitorStarted = await attachPurchaseMonitor(
+  startStartedMonitor(purchaseAttempt);
+
+  let monitorStarted;
+
+  try {
+    monitorStarted = await attachPurchaseMonitor(
     purchaseAttempt
-  );
+    );
+  } finally {
+  finishStartedMonitor(purchaseAttempt);
+  }
 
   result.monitorStatus = purchaseAttempt.monitorStatus;
   result.monitorStarted = monitorStarted;

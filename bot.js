@@ -1504,6 +1504,9 @@ if (message.msg_type === "proposal_open_contract") {
 
         delete activeContractMonitors[contractId];
 
+        entryMonitorState.activeContracts.delete(contractId);
+        renderEntryMonitor();
+
         console.log(
           "TradeProJB: Contrato terminado:",
           contractId

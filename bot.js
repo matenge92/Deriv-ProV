@@ -108,6 +108,31 @@ function finishProposalMonitor(pending) {
 
   renderEntryMonitor();
 }
+// ============================================================
+// BUY — CONTROLO DE ESTADO DO LED
+// ============================================================
+
+function startBuyMonitor(pending) {
+  if (!pending || pending.buyMonitorActive) return;
+
+  pending.buyMonitorActive = true;
+  entryMonitorState.buyPending++;
+
+  renderEntryMonitor();
+}
+
+function finishBuyMonitor(pending) {
+  if (!pending || !pending.buyMonitorActive) return;
+
+  pending.buyMonitorActive = false;
+
+  entryMonitorState.buyPending = Math.max(
+    0,
+    entryMonitorState.buyPending - 1
+  );
+
+  renderEntryMonitor();
+}
 
 let ticks = [],
   selectedDigit = 0;
@@ -1057,6 +1082,7 @@ if (optionsPending) {
   delete pendingOptionsRequests[requestKey];
   clearTimeout(optionsPending.timer);
   finishProposalMonitor(optionsPending);
+  finishBuyMonitor(optionsPending);
 
   const reconciliation = optionsPending.isBuy
     ? pendingBuyReconciliations[requestKey]
@@ -1737,6 +1763,7 @@ function sendOptionsRequest(payload, timeout = 15000) {
       if (pending) {
         delete pendingOptionsRequests[requestKey];
         finishProposalMonitor(pending);
+        finishBuyMonitor(pending);
 
         const timeoutError = new Error(
           pending.isBuy && pending.sent
@@ -1787,6 +1814,10 @@ function sendOptionsRequest(payload, timeout = 15000) {
 
       // Marcar como enviada depois de socket.send aceitar a mensagem.
       pendingRequest.sent = isBuy;
+
+      if (isBuy) {
+        startBuyMonitor(pendingRequest);
+      }
 
       console.log(
         "TradeProJB: Pedido Options API enviado:",
